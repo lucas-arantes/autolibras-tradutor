@@ -1,0 +1,14 @@
+{
+  "name": "@autolibras/vlibras",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Adaptadores para os serviços públicos do VLibras (tradução e avatar), carregados em tempo de execução",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@autolibras/core": "*"
+  }
+}

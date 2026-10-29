@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>AutoLibras</title>
+  <rect width="512" height="512" rx="112" fill="#0b5cad"/>
+  <path d="M150 330c-20-36-22-80 6-96 22-12 40 4 52 26l10 18V140c0-18 14-30 30-30s30 12 30 30v-14c0-18 14-30 30-30s30 12 30 30v28c0-18 14-30 30-30s30 12 30 30v156c0 74-52 122-124 122-56 0-90-30-124-102z" fill="#fff"/>
+</svg>

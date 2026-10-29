@@ -1,0 +1,26 @@
+{
+  "name": "@autolibras/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Aplicativo web (PWA) do AutoLibras Tradutor",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@autolibras/core": "*",
+    "@autolibras/gloss-rules": "*",
+    "@autolibras/stt-web": "*",
+    "@autolibras/vlibras": "*"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.7",
+    "vite": "^8.3.5"
+  }
+}

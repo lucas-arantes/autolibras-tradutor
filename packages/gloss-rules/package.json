@@ -1,0 +1,14 @@
+{
+  "name": "@autolibras/gloss-rules",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tradutor local de português para glosa de Libras baseado em regras",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@autolibras/core": "*"
+  }
+}

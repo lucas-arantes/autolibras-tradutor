@@ -1,0 +1,14 @@
+{
+  "name": "@autolibras/stt-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reconhecimento de fala no navegador (Web Speech API)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@autolibras/core": "*"
+  }
+}

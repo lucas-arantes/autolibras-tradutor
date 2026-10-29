@@ -1,0 +1,11 @@
+{
+  "name": "@autolibras/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interfaces, eventos e fila de sinais do AutoLibras",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

@@ -1,3 +1,4 @@
+export * from "./contacts";
 export * from "./gloss";
 export * from "./player";
 export * from "./sign-pack";

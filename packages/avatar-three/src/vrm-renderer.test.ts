@@ -1,6 +1,13 @@
 import { SignQueue } from "@autolibras/core";
-import { AnimationClip, Quaternion, QuaternionKeyframeTrack, Vector3 } from "three";
+import {
+  AnimationClip,
+  Quaternion,
+  QuaternionKeyframeTrack,
+  Vector3,
+  VectorKeyframeTrack,
+} from "three";
 import { describe, expect, it } from "vitest";
+import type { ContactSample } from "./contacts";
 import { blendPoses, smoothstep, TimelinePlayer } from "./player";
 import { type Pose, SignClip, SignPack, type SignPackManifest } from "./sign-pack";
 import { planGloss } from "./timeline";
@@ -25,7 +32,15 @@ function rotationClip(name: string, duration: number, a: number, b: number): Ani
     [0, duration],
     [...qa.toArray(), ...qb.toArray()],
   );
-  return new AnimationClip(name, duration, [track]);
+  // EU encosta a mão no peito durante o clipe todo.
+  const contact =
+    name === "EU"
+      ? [
+          new VectorKeyframeTrack("contact_right_chest_indexTip.position", [0], [0, -0.5, 0.3]),
+          new VectorKeyframeTrack("contact_right_chest_indexTip.scale", [0], [1, 1, 1]),
+        ]
+      : [];
+  return new AnimationClip(name, duration, [track, ...contact]);
 }
 
 function angleOf(pose: Pose, bone = "leftUpperArm"): number {
@@ -72,7 +87,7 @@ function fakePack(): SignPack {
 class FakeStage implements AvatarStage {
   readonly expressionNames: string[];
   tick?: (dt: number) => void;
-  frames: Array<{ pose: Pose; expressions: Map<string, number> }> = [];
+  frames: Array<{ pose: Pose; expressions: Map<string, number>; contacts: ContactSample[] }> = [];
   disposed = false;
 
   constructor(expressions: string[] = ["surprised", "browDown", "happy"]) {
@@ -81,10 +96,16 @@ class FakeStage implements AvatarStage {
 
   async load(): Promise<void> {}
 
-  render(pose: Pose, expressions: ReadonlyMap<string, number>): void {
+  render(
+    pose: Pose,
+    expressions: ReadonlyMap<string, number>,
+    _dt: number,
+    contacts: readonly ContactSample[] = [],
+  ): void {
     this.frames.push({
       pose: new Map([...pose].map(([k, q]) => [k, q.clone()])),
       expressions: new Map(expressions),
+      contacts: [...contacts],
     });
   }
 
@@ -313,6 +334,26 @@ describe("VrmRenderer (contrato do AvatarRenderer)", () => {
     }
     expect(Math.max(...yaws)).toBeGreaterThan(3);
     expect(stage.last.expressions.get("browDown")).toBeGreaterThan(0);
+    renderer.stop();
+    await play;
+  });
+
+  it("repassa ao palco os contatos do clipe, com o peso do crossfade", async () => {
+    const { stage, renderer } = await setup();
+    const play = renderer.play("CASA EU");
+    await flush();
+    const eu = planGloss("CASA EU", renderer.pack).segments[1];
+    await stage.advance((eu?.start ?? 0) + (eu?.blend ?? 0) / 2);
+    const [blending] = stage.last.contacts;
+    expect(blending?.weight).toBeGreaterThan(0.2);
+    expect(blending?.weight).toBeLessThan(0.8);
+    await stage.advance(0.3);
+    expect(stage.last.contacts).toEqual([
+      expect.objectContaining({ side: "right", anchor: "chest", point: "indexTip", weight: 1 }),
+    ]);
+    renderer.setContacts(false);
+    await stage.advance(0.1);
+    expect(stage.last.contacts).toEqual([]);
     renderer.stop();
     await play;
   });

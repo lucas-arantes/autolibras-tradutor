@@ -37,6 +37,7 @@ ap.add_argument("--assets", required=True)
 ap.add_argument("--out", required=True)
 ap.add_argument("--work", default=None)
 ap.add_argument("--blend", default=None, help="salva também o .blend final (depuração)")
+ap.add_argument("--hair", default=None, help="troca o cabelo (pasta em system/hair/), para testar outros")
 ARGS = ap.parse_args(argv)
 
 ASSETS = os.path.abspath(ARGS.assets)
@@ -77,10 +78,15 @@ PROXIES = {
     "eyelashes": ("Eyelashes", "eyelashes/eyelashes01/eyelashes01.mhclo", ("eyelashes/eyelashes01/eyelashes01.png", "BLEND", 256, 0.9)),
     "teeth": ("Teeth", "teeth/teeth_base/teeth_base.mhclo", ("teeth/teeth_base/teeth.png", "OPAQUE", 512, 0.4)),
     "tongue": ("Tongue", "tongue/tongue01/tongue01.mhclo", ("tongue/tongue01/tongue01_diffuse.png", "OPAQUE", 256, 0.5)),
-    "hair": ("Hair", "hair/short02/short02.mhclo", ("hair/short02/short02_diffuse.png", "CLIP", 1024, 0.75)),
+    # short01 deixa a testa livre: as sobrancelhas (gramaticais em Libras) ficam sempre visíveis.
+    "hair": ("Hair", "hair/short01/short01.mhclo", ("hair/short01/short01_diffuse.png", "CLIP", 1024, 0.75)),
     "clothes": ("Clothes", "clothes/male_casualsuit01/male_casualsuit01.mhclo", ("clothes/male_casualsuit01/male_casualsuit01_diffuse.png", "OPAQUE", 1024, 0.9)),
     "shoes": ("Clothes", "clothes/shoes06/shoes06.mhclo", ("clothes/shoes06/shoes06_diffuse.png", "OPAQUE", 512, 0.8)),
 }
+if ARGS.hair:
+    _tex = next(f for f in os.listdir(os.path.join(SYS, "hair", ARGS.hair)) if f.endswith(".png"))
+    PROXIES["hair"] = ("Hair", f"hair/{ARGS.hair}/{ARGS.hair}.mhclo", (f"hair/{ARGS.hair}/{_tex}", "CLIP", 1024, 0.75))
+
 # Pele: média de duas texturas CC0 do sistema (tom de pele intermediário).
 SKIN_TEXTURES = [
     ("skins/young_african_male/young_darkskinned_male_diffuse.png", 0.5),

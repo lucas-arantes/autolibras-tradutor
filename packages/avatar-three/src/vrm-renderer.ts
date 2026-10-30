@@ -1,6 +1,7 @@
 import { type AvatarRenderer, Emitter } from "@autolibras/core";
 import { Quaternion } from "three";
-import { applyHeadYaw, copyPose, TimelinePlayer } from "./player";
+import type { ContactSample } from "./contacts";
+import { applyBreathing, applyHeadYaw, copyPose, TimelinePlayer } from "./player";
 import { type Pose, type SignClip, SignPack } from "./sign-pack";
 import {
   type ExpressionCueName,
@@ -16,8 +17,13 @@ export interface AvatarStage {
   load(): Promise<void>;
   /** Expressões que o modelo tem (nomes VRM). */
   readonly expressionNames: readonly string[];
-  /** Aplica pose e expressões e desenha um quadro. */
-  render(pose: Pose, expressions: ReadonlyMap<string, number>, dt: number): void;
+  /** Aplica pose, contatos (IK) e expressões e desenha um quadro. */
+  render(
+    pose: Pose,
+    expressions: ReadonlyMap<string, number>,
+    dt: number,
+    contacts?: readonly ContactSample[],
+  ): void;
   /** Chama `tick(dt)` a cada quadro e devolve a função que para o laço. */
   start(tick: (dt: number) => void): () => void;
   dispose(): void;
@@ -53,6 +59,10 @@ export interface VrmRendererOptions {
   timeline?: Partial<TimelineOptions>;
   /** Tempo para voltar ao repouso depois de `stop()` (constante da suavização, s). */
   settleSeconds?: number;
+  /** Corrige os contatos das mãos com IK (padrão: sim). */
+  contacts?: boolean;
+  /** Respiração sutil, também durante a sinalização (padrão: sim). */
+  breathing?: boolean;
 }
 
 interface ActivePlay {
@@ -77,12 +87,17 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
   readonly #stage: AvatarStage;
   readonly #timelineOptions: Partial<TimelineOptions>;
   readonly #settle: number;
+  #contacts: boolean;
   #loading?: Promise<void>;
   #stopLoop?: () => void;
   #speed = 1;
   #playId = 0;
   #active?: ActivePlay;
   readonly #pose: Pose = new Map();
+  /** Pose entregue ao palco: `#pose` mais a respiração. */
+  readonly #out: Pose = new Map();
+  #clock = 0;
+  #breathing: boolean;
   readonly #rest: Pose = new Map();
   #expressionMap = new Map<ExpressionCueName, string>();
 
@@ -92,6 +107,8 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
     this.#stage = options.stage;
     this.#timelineOptions = options.timeline ?? {};
     this.#settle = options.settleSeconds ?? 0.12;
+    this.#contacts = options.contacts ?? true;
+    this.#breathing = options.breathing ?? true;
   }
 
   get speed(): number {
@@ -173,6 +190,11 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
     this.#speed = Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed));
   }
 
+  /** Liga ou desliga a correção de contatos (útil para comparar). */
+  setContacts(enabled: boolean): void {
+    this.#contacts = enabled;
+  }
+
   /** Para o laço de desenho e libera o palco. */
   dispose(): void {
     this.stop();
@@ -190,6 +212,7 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
 
   #tick(dt: number): void {
     const expressions = new Map<string, number>();
+    let contacts: ContactSample[] = [];
     const active = this.#active;
     if (active) {
       active.time += dt * this.#speed;
@@ -204,6 +227,7 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
         });
       }
       applyHeadYaw(this.#pose, frame.headYaw);
+      if (this.#contacts) contacts = frame.contacts;
       for (const [cue, weight] of frame.expressions) {
         const name = this.#expressionMap.get(cue);
         if (name) expressions.set(name, Math.max(weight, expressions.get(name) ?? 0));
@@ -221,7 +245,10 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
         if (!this.#rest.has(bone)) q.slerp(IDENTITY, k);
       }
     }
-    this.#stage.render(this.#pose, expressions, dt);
+    this.#clock += dt;
+    copyPose(this.#pose, this.#out);
+    if (this.#breathing) applyBreathing(this.#out, this.#clock);
+    this.#stage.render(this.#out, expressions, dt, contacts);
   }
 }
 

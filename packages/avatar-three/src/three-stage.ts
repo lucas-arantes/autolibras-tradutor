@@ -3,13 +3,19 @@ import {
   Color,
   DirectionalLight,
   HemisphereLight,
+  type Material,
+  type Mesh,
+  NeutralToneMapping,
   PerspectiveCamera,
+  PMREMGenerator,
   Scene,
   Timer,
   Vector3,
   WebGLRenderer,
 } from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { applyContacts, type ContactReport, type ContactSample } from "./contacts";
 import type { Pose } from "./sign-pack";
 import type { AvatarStage } from "./vrm-renderer";
 
@@ -23,6 +29,12 @@ export interface ThreeVrmStageOptions {
   autoBlink?: boolean;
 }
 
+/** Espaço de sinalização a enquadrar, em metros, em volta da cabeça e do quadril. */
+const FRAME_ABOVE_HEAD = 0.26;
+const FRAME_BELOW_HIPS = 0.02;
+/** Largura mínima visível (braços abertos em sinais como QUAL). */
+const FRAME_WIDTH = 1.0;
+
 /** Palco three.js: carrega o VRM, enquadra o espaço de sinalização e desenha. */
 export class ThreeVrmStage implements AvatarStage {
   readonly #options: ThreeVrmStageOptions;
@@ -34,6 +46,8 @@ export class ThreeVrmStage implements AvatarStage {
   #nextBlink = 2;
   #blinkTime = -1;
   #touched = new Set<string>();
+  #span = { top: 1.8, bottom: 0.9 };
+  #lastContacts?: ContactReport;
 
   constructor(options: ThreeVrmStageOptions) {
     this.#options = { background: "#eef2f6", autoBlink: true, ...options };
@@ -41,6 +55,15 @@ export class ThreeVrmStage implements AvatarStage {
 
   get vrm(): VRM | undefined {
     return this.#vrm;
+  }
+
+  get camera(): PerspectiveCamera {
+    return this.#camera;
+  }
+
+  /** Resultado da última correção de contatos (para diagnóstico). */
+  get lastContacts(): ContactReport | undefined {
+    return this.#lastContacts;
   }
 
   get expressionNames(): readonly string[] {
@@ -52,12 +75,26 @@ export class ThreeVrmStage implements AvatarStage {
     const { canvas, avatarUrl, background } = this.#options;
     const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: background === null });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Neutral (Khronos PBR Neutral) preserva matiz e saturação: o tom de pele não muda.
+    renderer.toneMapping = NeutralToneMapping;
     this.#renderer = renderer;
     if (background) this.#scene.background = new Color(background);
-    this.#scene.add(new HemisphereLight(0xffffff, 0x8899aa, 1.6));
-    const key = new DirectionalLight(0xffffff, 2.2);
-    key.position.set(0.6, 1.8, 2.2);
-    this.#scene.add(key);
+    // Luz de estúdio suave: o ambiente refletido (pele e olhos) e o hemisfério preenchem as
+    // sombras; a luz principal modela o rosto e a contraluz separa cabelo e mãos do fundo.
+    const pmrem = new PMREMGenerator(renderer);
+    this.#scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.#scene.environmentIntensity = 0.35;
+    pmrem.dispose();
+    this.#scene.add(new HemisphereLight(0xffffff, 0x9aa4b0, 0.8));
+    const lights: Array<[number, number, number, number, number]> = [
+      [0xfff4e8, 1.7, 0.9, 1.9, 2.4],
+      [0xffffff, 1.2, -0.4, 2.2, -1.8],
+    ];
+    for (const [color, intensity, x, y, z] of lights) {
+      const light = new DirectionalLight(color, intensity);
+      light.position.set(x, y, z);
+      this.#scene.add(light);
+    }
 
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -69,6 +106,12 @@ export class ThreeVrmStage implements AvatarStage {
     VRMUtils.rotateVRM0(vrm);
     vrm.scene.traverse((obj) => {
       obj.frustumCulled = false;
+      // Cabelo e cílios com recorte de alfa: alpha-to-coverage suaviza a borda com o MSAA.
+      const mesh = obj as Mesh;
+      const materials = mesh.isMesh ? ([] as Material[]).concat(mesh.material) : [];
+      for (const material of materials) {
+        if (material.alphaTest > 0) material.alphaToCoverage = true;
+      }
     });
     this.#scene.add(vrm.scene);
     this.#vrm = vrm;
@@ -80,21 +123,20 @@ export class ThreeVrmStage implements AvatarStage {
     this.#fit();
   }
 
-  /** Enquadra da cabeça à cintura, com espaço para os braços abertos. */
+  /** Mede o espaço de sinalização: do alto da cabeça ao quadril. */
   #frame(): void {
     const vrm = this.#vrm;
     if (!vrm) return;
     vrm.scene.updateMatrixWorld(true);
     const head = vrm.humanoid.getNormalizedBoneNode("head")?.getWorldPosition(new Vector3());
     const hips = vrm.humanoid.getNormalizedBoneNode("hips")?.getWorldPosition(new Vector3());
-    const top = (head?.y ?? 1.5) + 0.32;
-    const bottom = (hips?.y ?? 0.9) - 0.05;
-    const center = new Vector3(0, (top + bottom) / 2, 0);
-    const distance = (top - bottom) / 2 / Math.tan((this.#camera.fov * Math.PI) / 360) + 0.2;
-    this.#camera.position.set(0, center.y + 0.05, distance);
-    this.#camera.lookAt(center);
+    this.#span = {
+      top: (head?.y ?? 1.55) + FRAME_ABOVE_HEAD,
+      bottom: (hips?.y ?? 0.9) - FRAME_BELOW_HIPS,
+    };
   }
 
+  /** Ajusta a câmera ao tamanho do canvas, sem cortar a cabeça nem os braços abertos. */
   #fit(): void {
     const renderer = this.#renderer;
     if (!renderer) return;
@@ -104,17 +146,29 @@ export class ThreeVrmStage implements AvatarStage {
     if (canvas.width !== Math.round(width * renderer.getPixelRatio())) {
       renderer.setSize(width, height, false);
     }
-    this.#camera.aspect = width / height;
-    this.#camera.updateProjectionMatrix();
+    const camera = this.#camera;
+    camera.aspect = width / height;
+    const tan = Math.tan((camera.fov * Math.PI) / 360);
+    const { top, bottom } = this.#span;
+    const distance = Math.max((top - bottom) / 2 / tan, FRAME_WIDTH / 2 / (tan * camera.aspect));
+    const center = (top + bottom) / 2;
+    camera.position.set(0, center + 0.04, distance + 0.1);
+    camera.lookAt(0, center, 0);
+    camera.updateProjectionMatrix();
   }
 
-  render(pose: Pose, expressions: ReadonlyMap<string, number>, dt: number): void {
+  render(
+    pose: Pose,
+    expressions: ReadonlyMap<string, number>,
+    dt: number,
+    contacts: readonly ContactSample[] = [],
+  ): void {
     const vrm = this.#vrm;
     const renderer = this.#renderer;
     if (!vrm || !renderer) return;
-    for (const [bone, q] of pose) {
-      vrm.humanoid.getNormalizedBoneNode(bone as never)?.quaternion.copy(q);
-    }
+    const bone = (name: string) => vrm.humanoid.getNormalizedBoneNode(name as never);
+    for (const [name, q] of pose) bone(name)?.quaternion.copy(q);
+    this.#lastContacts = contacts.length ? applyContacts(bone, vrm.scene, contacts) : undefined;
     const manager = vrm.expressionManager;
     if (manager) {
       for (const name of this.#touched) manager.setValue(name, 0);

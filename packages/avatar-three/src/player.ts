@@ -1,4 +1,5 @@
 import { Quaternion, Vector3 } from "three";
+import type { ContactSample } from "./contacts";
 import type { Pose, SignClip } from "./sign-pack";
 import type { ExpressionCueName, Segment, Timeline } from "./timeline";
 
@@ -37,6 +38,17 @@ export function copyPose(source: Pose, out: Pose = new Map()): Pose {
 
 const IDENTITY = new Quaternion();
 const UP = new Vector3(0, 1, 0);
+const RIGHT = new Vector3(1, 0, 0);
+const FORWARD = new Vector3(0, 0, 1);
+/** Respiração: período (s) e amplitude (rad) de cada osso, sobre o eixo indicado. */
+const BREATH_PERIOD = 4.2;
+const BREATH: Array<[string, Vector3, number]> = [
+  ["spine", RIGHT, -0.01],
+  ["upperChest", RIGHT, -0.012],
+  ["head", RIGHT, 0.012],
+  ["leftShoulder", FORWARD, 0.025],
+  ["rightShoulder", FORWARD, -0.025],
+];
 const ENVELOPE = 0.15;
 
 /** Fade de entrada e saída de uma pista de expressão ou de cabeça. */
@@ -52,6 +64,8 @@ export interface PlayerFrame {
   expressions: Map<ExpressionCueName, number>;
   /** Giro da cabeça (rad) para os lados, do movimento de negação. */
   headYaw: number;
+  /** Contatos das mãos a corrigir com IK (já com os pesos do crossfade). */
+  contacts: ContactSample[];
 }
 
 /**
@@ -75,10 +89,18 @@ export class TimelinePlayer {
     return this.timeline.duration;
   }
 
-  #sampleSegment(segment: Segment, local: number, out: Pose): Pose {
+  #sampleSegment(
+    segment: Segment,
+    local: number,
+    out: Pose,
+    contacts: ContactSample[],
+    weight: number,
+  ): Pose {
     const clip = segment.clip ? this.#clips.get(segment.clip) : undefined;
     if (!clip) return copyPose(this.#initial, out);
-    return clip.sample(segment.from + Math.min(local, segment.to - segment.from), out);
+    const time = segment.from + Math.min(local, segment.to - segment.from);
+    clip.sampleContacts(time, weight, contacts);
+    return clip.sample(time, out);
   }
 
   /** Pose e pistas não manuais no instante `t` (segundos da linha do tempo). */
@@ -89,17 +111,19 @@ export class TimelinePlayer {
     let index = segments.findIndex((s) => t < s.end);
     if (index < 0) index = segments.length - 1;
     const segment = segments[index];
+    const contacts: ContactSample[] = [];
     if (segment) {
       const into = t - segment.start;
       if (into < segment.blend) {
+        const u = smoothstep(into / segment.blend);
         const prev = segments[index - 1];
         const a = prev
-          ? this.#sampleSegment(prev, Number.POSITIVE_INFINITY, this.#a)
+          ? this.#sampleSegment(prev, Number.POSITIVE_INFINITY, this.#a, contacts, 1 - u)
           : this.#initial;
-        const b = this.#sampleSegment(segment, 0, this.#b);
-        blendPoses(a, b, smoothstep(into / segment.blend), out);
+        const b = this.#sampleSegment(segment, 0, this.#b, contacts, u);
+        blendPoses(a, b, u, out);
       } else {
-        this.#sampleSegment(segment, (into - segment.blend) * segment.rate, out);
+        this.#sampleSegment(segment, (into - segment.blend) * segment.rate, out, contacts, 1);
       }
     } else {
       copyPose(this.#initial, out);
@@ -116,7 +140,7 @@ export class TimelinePlayer {
       // Balanço de ~2,5 Hz e 12°, como um "não" com a cabeça.
       if (w > 0) headYaw += w * 0.21 * Math.sin(2 * Math.PI * 2.5 * (t - cue.start));
     }
-    return { segment, expressions, headYaw };
+    return { segment, expressions, headYaw, contacts };
   }
 }
 
@@ -128,6 +152,20 @@ export function applyHeadYaw(pose: Pose, yaw: number): void {
     ["head", 0.6],
   ] as const) {
     const turn = new Quaternion().setFromAxisAngle(UP, yaw * share);
+    const q = pose.get(bone);
+    if (q) q.multiply(turn);
+    else pose.set(bone, turn);
+  }
+}
+
+/**
+ * Soma uma respiração lenta à pose (tórax e ombros sobem um pouco, a cabeça compensa),
+ * para o avatar não parecer congelado entre os sinais.
+ */
+export function applyBreathing(pose: Pose, time: number): void {
+  const phase = Math.sin((2 * Math.PI * time) / BREATH_PERIOD);
+  for (const [bone, axis, amplitude] of BREATH) {
+    const turn = new Quaternion().setFromAxisAngle(axis, amplitude * phase);
     const q = pose.get(bone);
     if (q) q.multiply(turn);
     else pose.set(bone, turn);

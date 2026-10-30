@@ -78,7 +78,7 @@ const pipeline = new Pipeline({ translator, renderer: avatar.renderer });
 
 ## Pacote de sinais (GPL-3.0, fora deste repositório)
 
-Os clipes vêm do dicionário aberto do VLibras ([vlibras-dictionary-sources](https://gitlab.lavid.ufpb.br/vlibras-public/vlibras-dictionary/vlibras-dictionary-sources), GPL-3.0). Por isso ficam fora deste repositório MIT: são gerados localmente, ignorados pelo git e carregados por URL em tempo de execução. O pacote completo é montado e publicado num repositório à parte, `autolibras-sinais`, que chama os scripts daqui. O repositório de origem traz o texto da GPLv3 sem a cláusula "ou posterior", então os clipes saem marcados como GPL-3.0-only.
+Os clipes vêm do dicionário aberto do VLibras ([vlibras-dictionary-sources](https://gitlab.lavid.ufpb.br/vlibras-public/vlibras-dictionary/vlibras-dictionary-sources), GPL-3.0). Por isso ficam fora deste repositório MIT: são gerados localmente, ignorados pelo git e carregados por URL em tempo de execução. O pacote completo é montado e publicado num repositório à parte, [autolibras-sinais](https://github.com/lucas-arantes/autolibras-sinais), que chama os scripts daqui. O pacote da região BR fica em https://lucas-arantes.github.io/autolibras-sinais/BR/. O repositório de origem traz o texto da GPLv3 sem a cláusula "ou posterior", então os clipes saem marcados como GPL-3.0-only.
 
 Para gerar um pacote, você precisa do Blender 4.5 ou mais recente e do Python 3:
 

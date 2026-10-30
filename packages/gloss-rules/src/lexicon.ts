@@ -101,6 +101,11 @@ export const REGULAR_VERBS = words(`
   receber responder resolver vender viver acontecer
   abrir assistir decidir desistir discutir dividir existir insistir partir permitir
   cumprir unir imprimir garantir admitir dirigir proibir
+  atrasar colocar chorar gritar sentar deitar consertar copiar assinar apagar desligar
+  abraçar beijar cumprimentar pular cortar pintar secar molhar esquentar esfriar
+  emprestar combinar
+  acender agradecer bater morder devolver mexer chover atender
+  latir tossir
 `);
 
 /**
@@ -109,8 +114,9 @@ export const REGULAR_VERBS = words(`
  * verbo depois de "eu" ou no início da frase. "como" é exceção ("Como você está?").
  */
 export const NOT_VERBS = words(`
-  casa casas conta contas volta fala ajuda troca compra compras marca pena falta forma
-  formas prova nota notas espera mostra parte partes como lembra cuida toca passa
+  casa casas conta contas volta troca compras marca pena falta forma formas prova nota
+  notas parte partes como nada entre leve grave interesse telefone toque corte cortes
+  seca pinta
 `);
 
 /** Expressões de várias palavras com sinal próprio. */
@@ -124,9 +130,16 @@ export const PHRASES: ReadonlyArray<readonly [string, string]> = [
   ["com licença", "COM_LICENÇA"],
   ["até logo", "ATÉ_LOGO"],
   ["até amanhã", "ATÉ_AMANHÃ"],
-  ["por que", "POR_QUE"],
-  ["por quê", "POR_QUE"],
-  ["fim de semana", "FIM_DE_SEMANA"],
+  ["por que", "PORQUE"],
+  ["por quê", "PORQUE"],
+  ["quantos anos", "QUANTO IDADE"],
+  ["muito obrigado", "MUITO OBRIGADO"],
+  ["muito obrigada", "MUITO OBRIGADO"],
+  ["fim de semana", "FIM_SEMANA"],
+  ["todos os dias", "TODO_DIA"],
+  ["todo dia", "TODO_DIA"],
+  ["mais tarde", "DEPOIS"],
+  ["há quanto tempo", "QUANTO TEMPO"],
   ["são paulo", "SÃO_PAULO"],
   ["rio de janeiro", "RIO_DE_JANEIRO"],
   ["belo horizonte", "BELO_HORIZONTE"],
@@ -169,7 +182,7 @@ export const NUMBERS: Readonly<Record<string, number>> = {
 /** Palavras terminadas em "s" que não são plurais (ou que o VLibras mantém). */
 export const NOT_PLURALS = words(`
   mais menos depois antes pois após atrás através lápis ônibus vírus tênis óculos
-  parabéns férias simples deus adeus jesus eles elas vocês nós vós alguns algumas
+  parabéns férias simples deus adeus jesus eles elas vocês nós vós alguns algumas libras
   três seis dois duas país mês
 `);
 
@@ -185,13 +198,18 @@ export const SINGULAR_EXCEPTIONS: Readonly<Record<string, string>> = {
   mães: "mãe",
 };
 
-/** Adjetivos femininos frequentes e sua forma masculina. */
-export const MASCULINE: Readonly<Record<string, string>> = Object.fromEntries(
-  `bonita linda nova velha feia alta baixa gorda magra rica cheia vazia ocupada
-   preocupada nervosa famosa gostosa obrigada sozinha pequena primeira outra muita pouca
-   toda mesma cansada animada atrasada casada solteira chateada feliz`
-    .trim()
-    .split(/\s+/)
-    .filter((w) => w.endsWith("a"))
-    .map((w) => [w, `${w.slice(0, -1)}o`]),
-);
+/**
+ * Adjetivos e substantivos de papel no feminino e sua forma masculina, que é a
+ * usada nas glosas do VLibras (PROFESSORA → PROFESSOR).
+ */
+export const MASCULINE: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(
+    `bonita linda nova velha feia alta baixa gorda magra rica cheia vazia ocupada
+     preocupada nervosa famosa gostosa obrigada sozinha pequena primeira outra muita pouca
+     toda mesma cansada animada atrasada casada solteira chateada`
+      .trim()
+      .split(/\s+/)
+      .map((w) => [w, `${w.slice(0, -1)}o`]),
+  ),
+  professora: "professor",
+};

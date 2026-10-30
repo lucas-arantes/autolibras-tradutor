@@ -109,13 +109,61 @@ function readNumber(tokens: Token[], index: number): [number, number] | undefine
   return [value, 1];
 }
 
+interface Sign {
+  gloss: string;
+  verb: boolean;
+}
+
+/**
+ * Monta a glosa de uma frase. Trata a negação como o VLibras: unida ao verbo
+ * seguinte (NÃO_GOSTAR) ou depois de um predicado não verbal (LONGE NÃO). Trata
+ * "muito" como intensidade: no verbo anterior (TRABALHAR(+)) ou na próxima
+ * palavra (BONITO(+)).
+ */
+class GlossBuilder {
+  readonly #signs: Sign[] = [];
+  #negate = false;
+  #intensify = false;
+
+  negate(): void {
+    this.#negate = true;
+  }
+
+  /** `nextIsContent`: a próxima palavra tem sinal próprio e pode receber a intensidade. */
+  intensify(nextIsContent: boolean): void {
+    const last = this.#signs.at(-1);
+    if (!nextIsContent && last?.verb && !last.gloss.endsWith("(+)")) last.gloss += "(+)";
+    else this.#intensify = true;
+  }
+
+  push(gloss: string, verb = false): void {
+    const sign = this.#intensify ? `${gloss}(+)` : gloss;
+    this.#intensify = false;
+    if (!this.#negate) {
+      this.#signs.push({ gloss: sign, verb });
+      return;
+    }
+    this.#negate = false;
+    if (verb) this.#signs.push({ gloss: `NÃO_${sign}`, verb });
+    else this.#signs.push({ gloss: sign, verb }, { gloss: "NÃO", verb: false });
+  }
+
+  finish(marker: string | undefined): string {
+    if (this.#intensify) this.#signs.push({ gloss: "MUITO", verb: false });
+    if (this.#negate) this.#signs.push({ gloss: "NÃO", verb: false });
+    const glosses = this.#signs.map((sign) => sign.gloss);
+    if (glosses.length > 0 && marker) glosses.push(marker);
+    return glosses.join(" ");
+  }
+}
+
 function glossSentence(sentence: string): string {
   const trimmed = sentence.trim();
   const marker = MARKERS[trimmed.slice(-1)];
   const words = trimmed.toLocaleLowerCase("pt-BR").match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu);
   if (!words) return "";
   const tokens = mergePhrases(words);
-  const output: string[] = [];
+  const output = new GlossBuilder();
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i] as Token;
@@ -126,10 +174,31 @@ function glossSentence(sentence: string): string {
       output.push(token.gloss);
       continue;
     }
+    if (word === "não") {
+      output.negate();
+      continue;
+    }
+    if (word === "muito") {
+      // "fala muito rápido" → RÁPIDO(+); "gosto muito de café" → GOSTAR(+).
+      // Expressões (TODO_DIA, BOM_DIA) não recebem intensidade.
+      const nextIsContent =
+        next !== undefined &&
+        !tokens[i + 1]?.gloss &&
+        !DROPPED.has(next) &&
+        !COPULA.has(next) &&
+        !lookupVerb(next);
+      output.intensify(nextIsContent);
+      continue;
+    }
     const number = readNumber(tokens, i);
     if (number) {
       output.push(String(number[0]));
       i += number[1] - 1;
+      // "às oito" → 8 HORA ("às oito horas" já traz a palavra).
+      const after = tokens[i + 1]?.word;
+      if (tokens[i - number[1]]?.word === "às" && after !== "hora" && after !== "horas") {
+        output.push("HORA");
+      }
       continue;
     }
     if (word === "que") {
@@ -139,23 +208,24 @@ function glossSentence(sentence: string): string {
     }
     if (DROPPED.has(word)) continue;
     if (FOI_FORMS.has(word)) {
-      if (next && DESTINATION_WORDS.has(next)) output.push("IR");
+      if (next && DESTINATION_WORDS.has(next)) output.push("IR", true);
       continue;
     }
     if (COPULA.has(word)) continue;
     if (IR_AUXILIARY.has(word)) {
       // "vou estudar" → ESTUDAR (o futuro fica nos advérbios de tempo, como no VLibras).
-      if (!(next && isInfinitive(next))) output.push("IR");
+      if (!(next && isInfinitive(next))) output.push("IR", true);
       continue;
     }
 
     const lemma = glossVerb(tokens, i, word);
     const base = lemma ?? singular(word);
-    output.push((MASCULINE[base] ?? base).toLocaleUpperCase("pt-BR"));
+    // Palavras compostas usam "_" como as expressões (GUARDA_CHUVA).
+    const gloss = (MASCULINE[base] ?? base).replaceAll("-", "_").toLocaleUpperCase("pt-BR");
+    output.push(gloss, lemma !== undefined);
   }
 
-  if (output.length > 0 && marker) output.push(marker);
-  return output.join(" ");
+  return output.finish(marker);
 }
 
 /** Traduz português para glosa de Libras com regras locais, sem rede. */

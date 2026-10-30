@@ -34,6 +34,10 @@ const ENDINGS = {
       "aria",
       "ariam",
       "ando",
+      // Imperativo e subjuntivo ("fale", "espere", "fique").
+      "e",
+      "es",
+      "em",
     ],
   },
   er: {
@@ -57,6 +61,10 @@ const ENDINGS = {
       "eria",
       "eriam",
       "endo",
+      // Imperativo e subjuntivo ("coma", "escreva", "conheça").
+      "a",
+      "as",
+      "am",
     ],
   },
   ir: {
@@ -80,6 +88,10 @@ const ENDINGS = {
       "iria",
       "iriam",
       "indo",
+      // Imperativo e subjuntivo ("abra", "decida", "dirija").
+      "a",
+      "as",
+      "am",
     ],
   },
 } as const;

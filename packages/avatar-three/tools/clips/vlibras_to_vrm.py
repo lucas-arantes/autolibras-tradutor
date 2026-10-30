@@ -125,7 +125,19 @@ def build_map():
 
 
 VRM_MAP = build_map()
-SOURCE_BONES = sorted({b for _, srcs, _, _ in VRM_MAP.values() for b, _ in srcs})
+EYES = ("BnOlho.L", "BnOlho.R")
+SOURCE_BONES = sorted({b for _, srcs, _, _ in VRM_MAP.values() for b, _ in srcs} | set(EYES))
+
+# Pontos da mão usados nos contatos. O avatar calcula os mesmos pontos (ver src/contacts.ts).
+HAND_POINTS = {
+    "wrist": (("head", "BnMao.{s}"),),
+    "palm": (("head", "BnMao.{s}"), ("head", "BnDedo.1.{s}.002")),
+    "indexTip": (("tail", "BnDedo.1.{s}.011"),),
+    "middleTip": (("tail", "BnDedo.1.{s}.009"),),
+    "thumbTip": (("tail", "BnDedo.1.{s}.013"),),
+}
+# Distâncias (na escala de cada âncora) em que o contato vale inteiro e em que some.
+CONTACT_RANGES = {"face": (2.2, 3.0), "chest": (0.55, 0.8), "hand": (0.6, 1.2)}
 
 
 def slug(name):
@@ -257,6 +269,105 @@ def retarget(frames, rest):
     return world_tracks, local_tracks
 
 
+def smoothstep(x):
+    x = min(1.0, max(0.0, x))
+    return x * x * (3 - 2 * x)
+
+
+def proximity(d, anchor):
+    near, far = CONTACT_RANGES[anchor]
+    return 1 - smoothstep((d - near) / (far - near))
+
+
+def hand_point(data, side, point):
+    refs = HAND_POINTS[point]
+    acc = Vector()
+    for which, bone in refs:
+        acc += joint(data, (which, bone.format(s=side)))
+    return to_gltf_vec(acc / len(refs))
+
+
+def extract_contacts(frames, rest, world_tracks):
+    """Onde cada mão está em relação ao rosto, ao peito e à outra mão, quadro a quadro.
+
+    O avatar tem proporções diferentes das do VLibras, então só copiar rotações tira a
+    mão do lugar nos sinais com contato (mão na testa, no queixo, mãos que se tocam).
+    Para cada mão e âncora próximas, grava o deslocamento do ponto de contato no
+    referencial da âncora, dividido pela escala dela (distância entre os olhos, largura
+    dos ombros ou comprimento da mão), e um peso que cai com a distância. No navegador,
+    um IK de dois ossos leva a mão do avatar ao mesmo lugar relativo.
+    """
+    eye_l, eye_r = (rest[e][1] for e in EYES)
+    scales = {
+        "face": (eye_l - eye_r).length,
+        "chest": (rest["BnBraco.L"][1] - rest["BnBraco.R"][1]).length,
+        "hand": (rest["BnMao.L"][1] - rest["BnDedo.1.L.009"][2]).length,
+    }
+    sides = (("left", "L", "R"), ("right", "R", "L"))
+    n = len(frames)
+    raw = {}  # (lado, âncora, ponto, ponto da outra mão) -> [(peso, deslocamento)]
+    for i, data in enumerate(frames):
+        face_o = to_gltf_vec((data[EYES[0]][1] + data[EYES[1]][1]) / 2)
+        chest_o = to_gltf_vec(data["BnPescoco"][1])
+        r_face = world_tracks["head"][i].inverted()
+        r_chest = world_tracks["upperChest"][i].inverted()
+        points = {
+            side: {p: hand_point(data, s, p) for p in HAND_POINTS} for side, s, _ in sides
+        }
+        for side, _, _ in sides:
+            other = "right" if side == "left" else "left"
+            own = points[side]
+            for anchor, origin, rot in (("face", face_o, r_face), ("chest", chest_o, r_chest)):
+                for p, pos in own.items():
+                    d = (pos - origin).length / scales[anchor]
+                    raw.setdefault((side, anchor, p, None), []).append(
+                        (d, rot @ ((pos - origin) / scales[anchor]))
+                    )
+            for p, pos in own.items():
+                for q, opos in points[other].items():
+                    d = (pos - opos).length / scales["hand"]
+                    raw.setdefault((side, "hand", p, q), []).append(
+                        (d, r_chest @ ((pos - opos) / scales["hand"]))
+                    )
+
+    # Um ponto de contato fixo por mão e âncora: o que chega mais perto no clipe todo.
+    best = {}
+    for key, series in raw.items():
+        side, anchor = key[0], key[1]
+        closest = min(d for d, _ in series)
+        if closest < best.get((side, anchor), (math.inf,))[0]:
+            best[(side, anchor)] = (closest, key)
+
+    def weights(side, anchor):
+        key = best[(side, anchor)][1]
+        return [proximity(d, anchor) for d, _ in raw[key]]
+
+    channels = []
+    for side, _, _ in sides:
+        w_face = weights(side, "face")
+        w_hand = weights(side, "hand")
+        # O rosto tem prioridade sobre o peito (o queixo também fica perto do pescoço).
+        w_chest = [w * (1 - f) for w, f in zip(weights(side, "chest"), w_face)]
+        for anchor, w in (("face", w_face), ("chest", w_chest), ("hand", w_hand)):
+            if max(w) < 0.05:
+                continue
+            key = best[(side, anchor)][1]
+            active = [i for i in range(n) if w[i] > 1e-3]
+            first, last = max(0, active[0] - 1), min(n - 1, active[-1] + 1)
+            channels.append(
+                {
+                    "side": side,
+                    "anchor": anchor,
+                    "point": key[2],
+                    "other": key[3],
+                    "frames": list(range(first, last + 1)),
+                    "weights": [w[i] if first < i < last or w[i] > 1e-3 else 0.0 for i in range(first, last + 1)],
+                    "offsets": [raw[key][i][1] for i in range(first, last + 1)],
+                }
+            )
+    return channels
+
+
 def angle_deg(a, b):
     """Ângulo entre duas rotações, ignorando o sinal do quaternion."""
     return math.degrees(2 * math.acos(min(1.0, abs(a.dot(b)))))
@@ -330,7 +441,9 @@ def detect_stroke(frames, fps, arm_len):
         speed[i] = max((pos[i + 1][k] - pos[i - 1][k]).length for k in range(2)) * fps / 2
     peak = max(dist)
     if peak < 0.1:
-        return 0, n - 1
+        # Sinal parado (como a letra E): o trecho principal é uma pausa curta no meio.
+        on = int(0.3 * n)
+        return on, min(n - 1, on + int(0.4 * fps))
     window = max(2, int(0.5 * fps))
 
     def first_min(start, step, stop):
@@ -356,8 +469,20 @@ def detect_stroke(frames, fps, arm_len):
     return on, off
 
 
-def write_glb(path, local_tracks, fps, meta, tol_deg):
-    """Grava o glTF binário: um nó por osso VRM e uma animação só de rotações."""
+def contact_node_name(channel):
+    """Nome do nó fictício de um contato, lido pelo SignClip (`contact_<lado>_<âncora>_...`)."""
+    parts = ["contact", channel["side"], channel["anchor"], channel["point"]]
+    if channel["other"]:
+        parts.append(channel["other"])
+    return "_".join(parts)
+
+
+def write_glb(path, local_tracks, fps, meta, tol_deg, contacts=()):
+    """Grava o glTF binário: um nó por osso VRM e uma animação de rotações.
+
+    Cada contato vira um nó fictício fora do esqueleto: a translação é o deslocamento
+    da mão no referencial da âncora e a escala (x = y = z) é o peso do contato.
+    """
     names = list(VRM_MAP)
     index = {name: i for i, name in enumerate(names)}
     nodes = []
@@ -415,6 +540,38 @@ def write_glb(path, local_tracks, fps, meta, tol_deg):
             {"sampler": len(samplers) - 1, "target": {"node": index[name], "path": "rotation"}}
         )
 
+    def add_vec3_channel(node, times, values, path):
+        t_view = add_view(struct.pack(f"<{len(times)}f", *times))
+        accessors.append(
+            {
+                "bufferView": t_view,
+                "componentType": 5126,
+                "count": len(times),
+                "type": "SCALAR",
+                "min": [min(times)],
+                "max": [max(times)],
+            }
+        )
+        flat = [c for v in values for c in v]
+        v_view = add_view(struct.pack(f"<{len(flat)}f", *flat))
+        accessors.append(
+            {"bufferView": v_view, "componentType": 5126, "count": len(values), "type": "VEC3"}
+        )
+        samplers.append(
+            {"input": len(accessors) - 2, "output": len(accessors) - 1, "interpolation": "LINEAR"}
+        )
+        channels.append({"sampler": len(samplers) - 1, "target": {"node": node, "path": path}})
+
+    roots = [index["hips"]]
+    for contact in contacts:
+        nodes.append({"name": contact_node_name(contact)})
+        node = len(nodes) - 1
+        roots.append(node)
+        times = [frame_times[i] for i in contact["frames"]]
+        offsets = [tuple(round(c, 4) for c in o) for o in contact["offsets"]]
+        add_vec3_channel(node, times, offsets, "translation")
+        add_vec3_channel(node, times, [(round(w, 4),) * 3 for w in contact["weights"]], "scale")
+
     gltf = {
         "asset": {
             "version": "2.0",
@@ -423,7 +580,7 @@ def write_glb(path, local_tracks, fps, meta, tol_deg):
             "extras": meta,
         },
         "scene": 0,
-        "scenes": [{"nodes": [index["hips"]]}],
+        "scenes": [{"nodes": roots}],
         "nodes": nodes,
         "animations": [
             {"name": meta["name"], "samplers": samplers, "channels": channels, "extras": meta}
@@ -536,7 +693,17 @@ def convert(path, out_dir, tol_deg):
         "license": "GPL-3.0-or-later",
     }
     glb = os.path.join(out_dir, f"{name}.glb")
-    decoded = write_glb(glb, local_tracks, fps, meta, tol_deg)
+    contacts = extract_contacts(frames, rest, world_tracks)
+    meta["contacts"] = [
+        {
+            "node": contact_node_name(c),
+            "start": round(c["frames"][0] / fps, 4),
+            "end": round(c["frames"][-1] / fps, 4),
+            "maxWeight": round(max(c["weights"]), 3),
+        }
+        for c in contacts
+    ]
+    decoded = write_glb(glb, local_tracks, fps, meta, tol_deg, contacts)
     meta["quality"] = measure(frames, rest, world_tracks, decoded, arm_len)
     meta["file"] = f"{name}.glb"
     meta["bytes"] = os.path.getsize(glb)

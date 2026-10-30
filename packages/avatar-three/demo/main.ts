@@ -26,6 +26,7 @@ const playButton = element<HTMLButtonElement>("play");
 const stopButton = element<HTMLButtonElement>("stop");
 const speedInput = element<HTMLInputElement>("speed");
 const speedValue = element<HTMLOutputElement>("speed-value");
+const contactsInput = element<HTMLInputElement>("contacts");
 const status = element<HTMLDivElement>("status");
 const now = element<HTMLDivElement>("now");
 const packInfo = element<HTMLElement>("pack-info");
@@ -64,6 +65,9 @@ speedInput.addEventListener("input", () => {
   renderer.setSpeed(Number(speedInput.value));
   speedValue.textContent = `${speedInput.value}×`;
 });
+// Desligar mostra a pose só com as rotações copiadas, sem o IK que leva a mão ao rosto,
+// ao peito ou à outra mão.
+contactsInput.addEventListener("change", () => renderer.setContacts(contactsInput.checked));
 for (const example of EXAMPLES) {
   const button = document.createElement("button");
   button.textContent = example;

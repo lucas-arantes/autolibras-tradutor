@@ -19,6 +19,10 @@ De cada sinal, a linha do tempo toca só o trecho principal, sem a ida e a volta
 
 As expressões faciais ficam numa pista separada. Na pergunta sim/não, o avatar ergue as sobrancelhas (`browUp`); na pergunta com QUE, ONDE, QUAL etc., franze a testa (`browDown`); na exclamação, usa `surprised`. Na negação, a cabeça balança e a testa franze. Se o modelo não tiver uma dessas expressões, o renderer usa a mais próxima que ele tiver.
 
+O avatar tem proporções diferentes das do avatar do VLibras, então copiar só as rotações tira a mão do lugar nos sinais com contato: em OBRIGADO, por exemplo, a mão iria parar no cabelo, e não na testa. Por isso cada clipe também diz onde a mão está em relação ao rosto, ao peito ou à outra mão, na escala de cada um (distância entre os olhos, largura dos ombros, comprimento da mão). A cada quadro, um IK de dois ossos (braço e antebraço) leva a mão do avatar ao mesmo lugar relativo, sem mudar a orientação da mão, e o peso da correção cai conforme a mão se afasta. Nos 53 sinais convertidos até agora, sem a correção a mão fica em média a 8,3 cm do ponto certo no rosto, a 3,1 cm no peito e a 8,9 cm em relação à outra mão. Com ela, a distância fica abaixo de 1,5 cm. A demo tem uma opção para desligar a correção e comparar.
+
+Fora dos sinais, o avatar respira devagar (tórax e ombros), para não ficar congelado.
+
 O renderer só calcula poses. Quem desenha é o `AvatarStage`: no navegador, `ThreeVrmStage`; nos testes, um palco falso com relógio manual.
 
 ```ts
@@ -49,8 +53,9 @@ A conversão (`tools/clips/vlibras_to_vrm.py`) roda no Blender headless:
 
 1. Toca a animação FK de cada `.blend`, com as restrições desligadas, e lê a rotação e a posição de cada osso em cada quadro.
 2. Leva as rotações para os ossos humanoides normalizados do VRM, cuja pose de descanso é a pose T com rotação identidade. A rotação de cada osso é a diferença em relação à pose T do VLibras, corrigida para que a direção do osso bata com a do segmento original. A torção do antebraço, que no VLibras fica em dois ossos, é dividida entre o antebraço e a mão.
-3. Detecta o trecho principal do sinal (`strokeStart` e `strokeEnd`) pela distância e pela velocidade dos punhos.
-4. Grava um `.glb` por sinal, só com rotações. Os quaternions ficam em int16 e os quadros-chave são reduzidos com erro máximo de 0,3°, o que dá cerca de 25 KB por sinal. Grava também as medidas de qualidade no `manifest.json`.
+3. Detecta o trecho principal do sinal (`strokeStart` e `strokeEnd`) pela distância e pela velocidade dos punhos. Num sinal parado, como a letra E, o trecho principal é uma pausa curta no meio do clipe.
+4. Mede os contatos: para cada mão perto do rosto, do peito ou da outra mão, grava o deslocamento do ponto mais próximo da mão (punho, palma ou ponta de dedo) no referencial dessa âncora, com um peso que cai com a distância.
+5. Grava um `.glb` por sinal com as rotações e os contatos, estes em nós fictícios (`contact_<lado>_<âncora>_<ponto>`, translação = deslocamento, escala = peso). Os quaternions ficam em int16 e os quadros-chave são reduzidos com erro máximo de 0,3°, o que dá de 20 a 35 KB por sinal. Grava também as medidas de qualidade no `manifest.json`.
 
 ## Demo
 

@@ -1,21 +1,48 @@
-import { type AnimationClip, type Interpolant, Quaternion, QuaternionKeyframeTrack } from "three";
+import {
+  type AnimationClip,
+  type Interpolant,
+  Quaternion,
+  QuaternionKeyframeTrack,
+  Vector3,
+  VectorKeyframeTrack,
+} from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import type { ContactAnchor, ContactSample, HandPoint, HandSide } from "./contacts";
 import type { SignCatalog, SignInfo } from "./timeline";
 
 /** Pose: rotação local de cada osso humanoide normalizado do VRM. */
 export type Pose = Map<string, Quaternion>;
+
+/** Nó fictício de contato gravado pelo conversor: `contact_<lado>_<âncora>_<ponto>[_<outro>]`. */
+const CONTACT_NODE =
+  /^contact_(left|right)_(face|chest|hand)_(wrist|palm|indexTip|middleTip|thumbTip)(?:_(wrist|palm|indexTip|middleTip|thumbTip))?$/;
+
+interface ContactChannel {
+  side: HandSide;
+  anchor: ContactAnchor;
+  point: HandPoint;
+  other: HandPoint | undefined;
+  offset?: Interpolant;
+  weight?: Interpolant;
+}
 
 /** Clipe de um sinal, amostrável em qualquer instante. */
 export class SignClip {
   readonly name: string;
   readonly duration: number;
   readonly #tracks: Array<{ bone: string; interpolant: Interpolant }> = [];
+  readonly #contacts = new Map<string, ContactChannel>();
 
   constructor(name: string, clip: AnimationClip) {
     this.name = name;
     this.duration = clip.duration;
     for (const track of clip.tracks) {
       const dot = track.name.lastIndexOf(".");
+      const contact = CONTACT_NODE.exec(track.name.slice(0, dot));
+      if (contact && track instanceof VectorKeyframeTrack) {
+        this.#addContactTrack(track, contact, track.name.slice(dot + 1));
+        continue;
+      }
       if (
         track.name.slice(dot + 1) !== "quaternion" ||
         !(track instanceof QuaternionKeyframeTrack)
@@ -28,8 +55,51 @@ export class SignClip {
     }
   }
 
+  #addContactTrack(track: VectorKeyframeTrack, match: RegExpExecArray, property: string): void {
+    const [node, side, anchor, point, other] = match;
+    if (!node) return;
+    let channel = this.#contacts.get(node);
+    if (!channel) {
+      channel = {
+        side: side as HandSide,
+        anchor: anchor as ContactAnchor,
+        point: point as HandPoint,
+        other: other as HandPoint | undefined,
+      };
+      this.#contacts.set(node, channel);
+    }
+    const interpolant = track.InterpolantFactoryMethodLinear();
+    if (property === "position") channel.offset = interpolant;
+    else if (property === "scale") channel.weight = interpolant;
+  }
+
   get bones(): string[] {
     return this.#tracks.map((t) => t.bone);
+  }
+
+  get hasContacts(): boolean {
+    return this.#contacts.size > 0;
+  }
+
+  /** Acrescenta a `out` os contatos ativos no instante `time`, com o peso multiplicado. */
+  sampleContacts(time: number, weight: number, out: ContactSample[]): ContactSample[] {
+    if (weight <= 0) return out;
+    const t = Math.min(Math.max(time, 0), this.duration);
+    for (const channel of this.#contacts.values()) {
+      if (!channel.offset || !channel.weight) continue;
+      const w = (channel.weight.evaluate(t)[0] ?? 0) * weight;
+      if (w <= 1e-3) continue;
+      const o = channel.offset.evaluate(t);
+      out.push({
+        side: channel.side,
+        anchor: channel.anchor,
+        point: channel.point,
+        other: channel.other,
+        offset: new Vector3(o[0], o[1], o[2]),
+        weight: w,
+      });
+    }
+    return out;
   }
 
   /** Escreve em `out` a pose do clipe no instante `time` (limitado à duração). */

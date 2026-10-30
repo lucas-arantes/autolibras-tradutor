@@ -16,6 +16,8 @@ o sha256 de cada arquivo, instala as extensões num perfil separado do Blender
 (`BLENDER_USER_RESOURCES`) e roda `build_avatar.py`. No fim, `verify_avatar.py`
 reimporta o modelo e grava prévias em `<cache>/previews`. O build leva cerca de um minuto.
 
+Para testar outro cabelo do pacote de sistema, passe `--hair <pasta>` ao `build_avatar.py`. O padrão é `short01`, que deixa a testa livre. Cabelos com franja escondem parte das sobrancelhas, que fazem parte da gramática da Libras.
+
 `check_vrm.mjs` carrega o arquivo com `@pixiv/three-vrm` no Node e imprime ossos,
 expressões e direções da pose T.
 

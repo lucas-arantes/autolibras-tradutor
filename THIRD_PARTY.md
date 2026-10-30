@@ -39,7 +39,7 @@ O servidor em `services/stt-server` instala estas dependências pelo pip. O mode
 | Asset | Origem | Licença |
 |---|---|---|
 | Malha base, alvos de modelagem, rig "default" e pesos | Dados que acompanham o MPFB 2.0.18 | CC0 |
-| Olhos `low-poly` (material `brown`), sobrancelhas `eyebrow001`, cílios `eyelashes01`, dentes `teeth_base`, língua `tongue01`, cabelo `short02`, roupa `male_casualsuit01`, sapatos `shoes06`, texturas de pele `young_african_male` e `young_caucasian_male` (misturadas) | [MakeHuman system assets](https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html) (`makehuman_system_assets_cc0.zip`) | CC0 |
+| Olhos `low-poly` (material `brown`), sobrancelhas `eyebrow001`, cílios `eyelashes01`, dentes `teeth_base`, língua `tongue01`, cabelo `short01`, roupa `male_casualsuit01`, sapatos `shoes06`, texturas de pele `young_african_male` e `young_caucasian_male` (misturadas) | [MakeHuman system assets](https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html) (`makehuman_system_assets_cc0.zip`) | CC0 |
 | Unidades faciais no estilo ARKit (base das expressões) | [Faceunits 01](https://files.makehumancommunity.org/functional/faceunits01.zip), de Mika Suominen | CC0 |
 | Visemas `aa_02`, `y_iy_ih_ix_06`, `w_uw_07`, `ey_eh_uh_04`, `ow_08` | [Visemes 01](https://files.makehumancommunity.org/functional/visemes01.zip), de Mika Suominen | CC0 |
 

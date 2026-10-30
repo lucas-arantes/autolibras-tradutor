@@ -1,2 +1,2 @@
 export { RulesTranslator, singular, toGloss } from "./translator";
-export { isInfinitive, lookupVerb } from "./verbs";
+export { conjugate, findVerb, isInfinitive, lookupVerb, toSign, type Vocabulary } from "./verbs";

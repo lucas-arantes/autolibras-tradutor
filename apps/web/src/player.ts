@@ -15,6 +15,7 @@
 import { FallbackTranslator, Pipeline } from "@autolibras/core";
 import { RulesTranslator } from "@autolibras/gloss-rules";
 import {
+  loadVLibrasVocabulary,
   VLibrasApiTranslator,
   type VLibrasAvatar,
   VLibrasWidgetRenderer,
@@ -24,6 +25,9 @@ const AVATARS: readonly VLibrasAvatar[] = ["icaro", "hosana", "guga"];
 
 const params = new URLSearchParams(location.search);
 const rules = new RulesTranslator();
+loadVLibrasVocabulary()
+  .then((vocabulary) => rules.setVocabulary(vocabulary))
+  .catch(() => undefined);
 const translator =
   params.get("translator") === "regras"
     ? rules

@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { VLibrasApiTranslator } from "./api-translator";
 import { shieldFromTextCapture } from "./text-capture-shield";
+import { loadVLibrasVocabulary } from "./vocabulary";
 import { type VLibrasGlobal, type VLibrasStatus, VLibrasWidgetRenderer } from "./widget-renderer";
 
 describe("VLibrasApiTranslator", () => {
@@ -143,5 +144,50 @@ describe("shieldFromTextCapture", () => {
     shieldFromTextCapture(app);
     app.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
     expect(reached).toBe(0);
+  });
+});
+
+describe("loadVLibrasVocabulary", () => {
+  const trie = {
+    root: {
+      children: {
+        C: {
+          children: {
+            A: {
+              children: {
+                S: {
+                  children: {
+                    A: { end: true, children: { R: { end: true, children: {} } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+
+  it("lê a árvore de prefixos e guarda no armazenamento local", async () => {
+    const stored = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => void stored.set(key, value),
+    };
+    let requests = 0;
+    const fetchFn = async () => {
+      requests++;
+      return new Response(JSON.stringify(trie));
+    };
+    const first = await loadVLibrasVocabulary({ fetch: fetchFn, storage });
+    expect([...first].sort()).toEqual(["CASA", "CASAR"]);
+    const second = await loadVLibrasVocabulary({ fetch: fetchFn, storage });
+    expect(second).toEqual(first);
+    expect(requests).toBe(1);
+  });
+
+  it("falha quando o servidor responde com erro", async () => {
+    const fetchFn = async () => new Response("", { status: 503 });
+    await expect(loadVLibrasVocabulary({ fetch: fetchFn, storage: null })).rejects.toThrow("503");
   });
 });

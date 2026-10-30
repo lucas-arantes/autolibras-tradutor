@@ -12,7 +12,7 @@ Microfone ─► Web Speech API ou servidor Whisper ─► Texto ─► Glosa (V
 
 A fala pode ser transcrita de dois jeitos. O padrão é a Web Speech API do navegador, que não exige instalar nada. A outra opção é o [servidor de transcrição do projeto](services/stt-server/README.md), que usa o Whisper e pode rodar no seu computador, assim o áudio não sai da máquina. Nos dois casos, os resultados parciais aparecem como legenda antes de a frase terminar.
 
-Cada frase transcrita vai para o tradutor de glosa do VLibras. Se ele falhar ou levar mais de 4 segundos, o app usa um tradutor de regras próprio, que roda no navegador. Também dá para usar só as regras, sem enviar o texto a nenhum servidor.
+Cada frase transcrita vai para o tradutor de glosa do VLibras. Se ele falhar ou levar mais de 4 segundos, o app usa um tradutor de regras próprio, que roda no navegador. Também dá para usar só as regras, sem enviar o texto a nenhum servidor. As regras baixam uma vez a lista de sinais do VLibras e a guardam no navegador; com ela, reconhecem verbos e expressões que não estão na lista do próprio pacote. Sem a lista, continuam funcionando.
 
 O avatar é o Widget oficial do VLibras, carregado dos servidores do governo quando a página abre. O app manda a glosa direto para o player do Widget.
 
@@ -49,7 +49,7 @@ Abra http://localhost:5173. O avatar precisa de WebGL e leva alguns segundos par
 ```text
 packages/
   core/          Interfaces (reconhecedor, tradutor, avatar), Pipeline, SignQueue, FallbackTranslator
-  gloss-rules/   Tradutor PT→glosa por regras (verbos, plurais, números, expressões)
+  gloss-rules/   Tradutor PT→glosa por regras (verbos, plurais, números, expressões), com ou sem o dicionário de sinais
   stt-web/       Reconhecimento de fala: Web Speech API e cliente do servidor Whisper
   vlibras/       Adaptadores do VLibras: API de tradução, avatar do Widget, proteção contra captura de cliques
   avatar-three/  Avatar próprio em VRM (three.js), em desenvolvimento e ainda fora do app

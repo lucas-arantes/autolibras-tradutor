@@ -7,7 +7,11 @@ import {
 } from "@autolibras/core";
 import { RulesTranslator } from "@autolibras/gloss-rules";
 import { RemoteWhisperRecognizer, WebSpeechRecognizer } from "@autolibras/stt-web";
-import { VLibrasApiTranslator, VLibrasWidgetRenderer } from "@autolibras/vlibras";
+import {
+  loadVLibrasVocabulary,
+  VLibrasApiTranslator,
+  VLibrasWidgetRenderer,
+} from "@autolibras/vlibras";
 import {
   loadSettings,
   type RecognizerMode,
@@ -38,8 +42,10 @@ export type AvatarStatus = "carregando" | "pronto" | "erro";
 
 const MAX_ENTRIES = 50;
 
+// Uma instância só: recebe o dicionário de sinais quando ele termina de carregar.
+const rules = new RulesTranslator();
+
 function createTranslator(mode: TranslatorMode): GlossTranslator {
-  const rules = new RulesTranslator();
   return mode === "vlibras" ? new FallbackTranslator([new VLibrasApiTranslator(), rules]) : rules;
 }
 
@@ -83,6 +89,10 @@ export class TranslatorController {
     });
     this.#useRecognizer();
     this.#bindEvents();
+    // O dicionário melhora as regras locais; sem ele, elas funcionam do mesmo jeito.
+    loadVLibrasVocabulary()
+      .then((vocabulary) => rules.setVocabulary(vocabulary))
+      .catch(() => undefined);
   }
 
   /** Troca o reconhecedor de fala conforme a configuração, parando o anterior. */

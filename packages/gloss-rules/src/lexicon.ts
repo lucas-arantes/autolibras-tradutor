@@ -81,6 +81,21 @@ export const IRREGULAR_VERBS: Readonly<Record<string, string>> = Object.fromEntr
     construir:
       "construo constróis constrói construímos constroem construí construiu construíram construía construindo",
     caber: "caibo cabe cabem coube couberam cabia",
+    cair: "caio cais cai caímos caem caí caiu caíram caía caíam cairei cairá caindo caia caiam",
+    // Sem "rio", que quase sempre é o substantivo.
+    rir: "ris ri rimos riem riu riram ria riam rirei rindo",
+    odiar: "odeio odeias odeia odiamos odeiam odiei odiou odiaram odiava odiavam odeie odeiem",
+    sumir: "sumo somes some sumimos somem sumi sumiu sumiram sumia sumiam sumindo suma",
+    traduzir:
+      "traduzo traduzes traduz traduzimos traduzem traduzi traduziu traduziram traduzia traduzindo traduza",
+    reduzir:
+      "reduzo reduzes reduz reduzimos reduzem reduzi reduziu reduziram reduzia reduzindo reduza",
+    medir: "meço medes mede medimos medem medi mediu mediram medindo meça",
+    doer: "dói doem doeu doeram doía doíam doendo",
+    descobrir:
+      "descubro descobres descobre descobrimos descobrem descobri descobriu descobriram descobria descobrindo descubra",
+    repetir:
+      "repito repetes repete repetimos repetem repeti repetiu repetiram repetia repetindo repita",
   }).flatMap(([lemma, forms]) => forms.split(" ").map((form) => [form, lemma] as const)),
 );
 
@@ -106,6 +121,18 @@ export const REGULAR_VERBS = words(`
   emprestar combinar
   acender agradecer bater morder devolver mexer chover atender
   latir tossir
+  acalmar aconselhar acostumar adiar adivinhar ajoelhar alcançar alimentar amarrar ameaçar
+  anotar apertar aplaudir apoiar aprovar arrumar assustar atrapalhar aumentar brigar
+  caminhar carregar cobrar colar comemorar comentar comparar completar comunicar concordar
+  confiar consultar contar continuar controlar convidar costurar criar curtir descrever
+  desejar destruir diminuir discordar divertir dobrar duvidar economizar educar empurrar
+  encher enganar ensaiar enxergar errar esconder escovar espalhar estragar exagerar
+  experimentar festejar filmar fingir fumar incluir informar instalar inventar lamentar
+  libertar machucar mastigar matar mentir misturar necessitar negociar obedecer observar
+  operar orar passear perdoar pesquisar plantar praticar preencher prometer proteger
+  provar publicar puxar queimar reconhecer recusar relaxar respirar reunir rezar roubar
+  segurar separar sofrer soltar somar sujar surgir temer transformar tratar vencer vigiar
+  voar xingar
 `);
 
 /**
@@ -117,6 +144,10 @@ export const NOT_VERBS = words(`
   casa casas conta contas volta troca compras marca pena falta forma formas prova nota
   notas parte partes como nada entre leve grave interesse telefone toque corte cortes
   seca pinta
+  alimento aperto apoio aumento caminho conto desejo engano ensaio erro estrago exagero
+  experimento fumo lamento seguro completo completa dobro sujo curto solto solta calo colo
+  ameaça briga cobra cobre cola consulta consultas controle costura dobra escova filme
+  informe mata mente menta mistura pesquisa planta puxa reza segura tema vigia alcance
 `);
 
 /** Expressões de várias palavras com sinal próprio. */
@@ -135,7 +166,7 @@ export const PHRASES: ReadonlyArray<readonly [string, string]> = [
   ["quantos anos", "QUANTO IDADE"],
   ["muito obrigado", "MUITO OBRIGADO"],
   ["muito obrigada", "MUITO OBRIGADO"],
-  ["fim de semana", "FIM_SEMANA"],
+  ["fim de semana", "FIM_DE_SEMANA"],
   ["todos os dias", "TODO_DIA"],
   ["todo dia", "TODO_DIA"],
   ["mais tarde", "DEPOIS"],

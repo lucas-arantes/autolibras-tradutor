@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RulesTranslator, singular, toGloss } from "./translator";
-import { lookupVerb } from "./verbs";
+import { findVerb, lookupVerb } from "./verbs";
 
 describe("toGloss", () => {
   // Frases e glosas de referência do tradutor do VLibras (consultado em 29/10/2026),
@@ -68,6 +68,30 @@ describe("toGloss", () => {
     expect(toGloss("Quero que você estude.")).toBe("QUERER VOCÊ ESTUDAR [PONTO]");
   });
 
+  it("conjuga verbos irregulares e não confunde substantivos da lista nova", () => {
+    expect(toGloss("Ele caiu da escada.")).toBe("ELE CAIR ESCADA [PONTO]");
+    expect(toGloss("Eu odeio frio.")).toBe("EU ODIAR FRIO [PONTO]");
+    expect(toGloss("O filme foi bom.")).toBe("FILME BOM [PONTO]");
+    expect(toGloss("Medo de altura.")).toBe("MEDO ALTURA [PONTO]");
+    expect(toGloss("Ela vê planta e pesquisa nova.")).toBe("ELA VER PLANTA PESQUISA NOVO [PONTO]");
+  });
+
+  it("usa o contexto para decidir entre verbo e substantivo", () => {
+    // Plural de substantivo não vira 2ª pessoa de verbo ("tu filmes").
+    expect(toGloss("Ela adora filmes de terror.")).toBe("ELA ADORAR FILME TERROR [PONTO]");
+    // Advérbio entre o sujeito e o verbo.
+    expect(toGloss("Eu sempre escovo os dentes.")).toBe("EU SEMPRE ESCOVAR DENTE [PONTO]");
+    // Depois de pronome sujeito, a palavra ambígua é verbo.
+    expect(toGloss("Ela costura roupas.")).toBe("ELA COSTURAR ROUPA [PONTO]");
+    expect(toGloss("A costura ficou boa.")).toBe("COSTURA FICAR BOA [PONTO]");
+  });
+
+  it("trata 'por que' no meio da frase e o convite com 'vamos'", () => {
+    expect(toGloss("Eu não entendo por que ele saiu.")).toBe("EU NÃO_ENTENDER ELE SAIR [PONTO]");
+    expect(toGloss("Por que ele saiu?")).toBe("PORQUE ELE SAIR [INTERROGAÇÃO]");
+    expect(toGloss("Vamos comemorar!")).toBe("VAMOS COMEMORAR [EXCLAMAÇÃO]");
+  });
+
   it("não confunde palavras comuns com formas verbais", () => {
     expect(toGloss("Eu não quero nada.")).toBe("EU NÃO_QUERER NADA [PONTO]");
     expect(toGloss("A escola fica entre a praça e o rio.")).toBe(
@@ -83,7 +107,7 @@ describe("toGloss", () => {
       "VOCÊS MORAR AQUI QUANTO TEMPO [INTERROGAÇÃO]",
     );
     expect(toGloss("Ligue mais tarde.")).toBe("LIGAR DEPOIS [PONTO]");
-    expect(toGloss("Vou viajar no fim de semana.")).toBe("VIAJAR FIM_SEMANA [PONTO]");
+    expect(toGloss("Vou viajar no fim de semana.")).toBe("VIAJAR FIM_DE_SEMANA [PONTO]");
     // Expressões não recebem a intensidade de "muito"; ela vai para o verbo.
     expect(toGloss("Ele trabalha muito todos os dias.")).toBe("ELE TRABALHAR(+) TODO_DIA [PONTO]");
   });
@@ -148,5 +172,65 @@ describe("lookupVerb", () => {
 describe("RulesTranslator", () => {
   it("identifica a fonte", async () => {
     expect(await new RulesTranslator().translate("Oi")).toEqual({ gloss: "OI", source: "regras" });
+  });
+});
+
+describe("toGloss com dicionário de sinais", () => {
+  // Amostra do formato do dicionário do VLibras (o real tem ~22 mil sinais e não fica no repositório).
+  const vocabulary = new Set([
+    "VARRER",
+    "PASSEAR",
+    "INCLUIR",
+    "MULHER",
+    "PARQUE",
+    "CASA",
+    "CASAR",
+    "CACHORRO_QUENTE",
+    "DIRETOR",
+    "COSTAS",
+    "QUERER",
+    "COMER",
+  ]);
+
+  it("reconhece verbos do dicionário que não estão na lista do pacote", () => {
+    expect(toGloss("Ele varreu a casa.", vocabulary)).toBe("ELE VARRER CASA [PONTO]");
+    expect(toGloss("Nós passeamos no parque.", vocabulary)).toBe("NÓS PASSEAR PARQUE [PONTO]");
+    expect(toGloss("O preço inclui o café.", vocabulary)).toBe("PREÇO INCLUIR CAFÉ [PONTO]");
+    // Sem o dicionário, a forma conjugada fica como está.
+    expect(toGloss("Ele varreu a casa.")).toBe("ELE VARREU CASA [PONTO]");
+  });
+
+  it("não transforma em verbo palavra que já é sinal", () => {
+    // "casa" é sinal; "mulheres" é plural de um sinal, não forma de um verbo "mulher".
+    expect(toGloss("A casa é grande.", vocabulary)).toBe("CASA GRANDE [PONTO]");
+    expect(toGloss("As mulheres passeiam.", vocabulary)).toBe("MULHER PASSEAR [PONTO]");
+  });
+
+  it("junta expressões que existem no dicionário", () => {
+    expect(toGloss("Eu quero comer cachorro quente.", vocabulary)).toBe(
+      "EU QUERER COMER CACHORRO_QUENTE [PONTO]",
+    );
+  });
+
+  it("usa o masculino de adjetivos depois de cópula ou intensificador", () => {
+    const withCaro = new Set([...vocabulary, "CARA", "CARO", "FRUTA"]);
+    expect(toGloss("As frutas estão muito caras.", withCaro)).toBe("FRUTA CARO(+) [PONTO]");
+    expect(toGloss("A cara dele.", withCaro)).toBe("CARA DELE [PONTO]");
+  });
+
+  it("escolhe a forma da palavra que tem sinal", () => {
+    expect(toGloss("A diretora chegou.", vocabulary)).toBe("DIRETOR CHEGAR [PONTO]");
+    expect(toGloss("Ele machucou as costas.", vocabulary)).toBe("ELE MACHUCAR COSTAS [PONTO]");
+  });
+});
+
+describe("conjugação", () => {
+  it("trata verbos em -ear e -uir", () => {
+    expect(lookupVerb("passeio")?.lemma).toBe("passear");
+    expect(lookupVerb("incluíram")?.lemma).toBe("incluir");
+    // Verbos fora da lista, achados só pelo dicionário.
+    expect(lookupVerb("penteia")).toBeUndefined();
+    expect(findVerb("penteia", new Set(["PENTEAR"]))?.lemma).toBe("pentear");
+    expect(findVerb("possui", new Set(["POSSUIR"]))?.lemma).toBe("possuir");
   });
 });

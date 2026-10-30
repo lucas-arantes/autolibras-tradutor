@@ -12,7 +12,7 @@ import {
   PHRASES,
   SINGULAR_EXCEPTIONS,
 } from "./lexicon";
-import { isInfinitive, lookupVerb } from "./verbs";
+import { findVerb, isInfinitive, lookupVerb, toSign, type Vocabulary } from "./verbs";
 
 const MARKERS: Readonly<Record<string, string>> = {
   ".": "[PONTO]",
@@ -32,13 +32,26 @@ const PHRASE_TABLE = PHRASES.map(([phrase, gloss]) => [phrase.split(" "), gloss]
   (a, b) => b[0].length - a[0].length,
 );
 
-function mergePhrases(words: string[]): Token[] {
+/** Maior expressão do dicionário que começa em `index` ("fim de semana" → FIM_DE_SEMANA). */
+function vocabularyPhrase(words: string[], index: number, vocabulary: Vocabulary): number {
+  for (let size = Math.min(4, words.length - index); size >= 2; size--) {
+    if (vocabulary.has(toSign(words.slice(index, index + size).join("_")))) return size;
+  }
+  return 0;
+}
+
+function mergePhrases(words: string[], vocabulary?: Vocabulary): Token[] {
   const tokens: Token[] = [];
   for (let i = 0; i < words.length; i++) {
     const match = PHRASE_TABLE.find(([parts]) => parts.every((part, j) => words[i + j] === part));
+    const size = match ? 0 : vocabulary ? vocabularyPhrase(words, i, vocabulary) : 0;
     if (match) {
       tokens.push({ word: match[0].join(" "), gloss: match[1] });
       i += match[0].length - 1;
+    } else if (size > 0) {
+      const parts = words.slice(i, i + size);
+      tokens.push({ word: parts.join(" "), gloss: toSign(parts.join("_")) });
+      i += size - 1;
     } else {
       tokens.push({ word: words[i] as string });
     }
@@ -82,10 +95,35 @@ function previousWord(
   return undefined;
 }
 
-const SKIP_BEFORE_VERB = new Set([...CLITICS, "não"]);
+// Palavras que podem ficar entre o sujeito e o verbo ("eu sempre escovo").
+const SKIP_BEFORE_VERB = new Set([
+  ...CLITICS,
+  "não",
+  "sempre",
+  "nunca",
+  "também",
+  "já",
+  "ainda",
+  "só",
+  "agora",
+  "logo",
+]);
 
-function glossVerb(tokens: Token[], index: number, word: string): string | undefined {
-  const verb = lookupVerb(word);
+// Depois de um pronome sujeito, uma palavra ambígua ("costura", "planta") é verbo.
+const SUBJECT_PRONOUNS = new Set(["ele", "ela", "você", "nós", "eles", "elas", "vocês", "gente"]);
+
+function glossVerb(
+  tokens: Token[],
+  index: number,
+  word: string,
+  vocabulary?: Vocabulary,
+): string | undefined {
+  const subject = previousWord(tokens, index, SKIP_BEFORE_VERB);
+  if (subject !== undefined && SUBJECT_PRONOUNS.has(subject)) {
+    const forced = lookupVerb(word, { includeNouns: true }) ?? findVerb(word, vocabulary);
+    if (forced && forced.kind === "finite") return forced.lemma;
+  }
+  const verb = findVerb(word, vocabulary, singular);
   if (!verb) return undefined;
   if (verb.kind === "1sg") {
     // Com "eu" antes ou no início da frase, já que o sujeito costuma ser omitido ("Moro em...").
@@ -157,12 +195,40 @@ class GlossBuilder {
   }
 }
 
-function glossSentence(sentence: string): string {
+/**
+ * Forma do substantivo ou adjetivo: singular e masculino, como nas glosas do
+ * VLibras. Com o dicionário, mantém a forma original quando só ela existe
+ * (LIBRAS) e usa o masculino de substantivos que não têm sinal no feminino
+ * (PROFESSORA → PROFESSOR).
+ */
+function nounForm(word: string, vocabulary?: Vocabulary, adjective = false): string {
+  let base = singular(word);
+  if (vocabulary && !vocabulary.has(toSign(base)) && vocabulary.has(toSign(word))) base = word;
+  const masculine = MASCULINE[base];
+  if (masculine) return masculine;
+  if (
+    adjective &&
+    vocabulary &&
+    base.endsWith("a") &&
+    vocabulary.has(toSign(`${base.slice(0, -1)}o`))
+  ) {
+    // "estão muito caras" → CARO, como o VLibras faz com adjetivos.
+    return `${base.slice(0, -1)}o`;
+  }
+  if (!vocabulary || vocabulary.has(toSign(base))) return base;
+  const candidates = [
+    base.endsWith("ora") ? base.slice(0, -1) : "",
+    base.endsWith("a") ? `${base.slice(0, -1)}o` : "",
+  ];
+  return candidates.find((c) => c && vocabulary.has(toSign(c))) ?? base;
+}
+
+function glossSentence(sentence: string, vocabulary?: Vocabulary): string {
   const trimmed = sentence.trim();
   const marker = MARKERS[trimmed.slice(-1)];
   const words = trimmed.toLocaleLowerCase("pt-BR").match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu);
   if (!words) return "";
-  const tokens = mergePhrases(words);
+  const tokens = mergePhrases(words, vocabulary);
   const output = new GlossBuilder();
 
   for (let i = 0; i < tokens.length; i++) {
@@ -171,6 +237,8 @@ function glossSentence(sentence: string): string {
     const next = tokens[i + 1]?.word;
 
     if (token.gloss) {
+      // "por que" no meio de uma afirmação é conjunção ("não entendo por que ele saiu").
+      if (token.gloss === "PORQUE" && i > 0 && marker !== "[INTERROGAÇÃO]") continue;
       output.push(token.gloss);
       continue;
     }
@@ -186,7 +254,7 @@ function glossSentence(sentence: string): string {
         !tokens[i + 1]?.gloss &&
         !DROPPED.has(next) &&
         !COPULA.has(next) &&
-        !lookupVerb(next);
+        !findVerb(next, vocabulary, singular);
       output.intensify(nextIsContent);
       continue;
     }
@@ -213,31 +281,50 @@ function glossSentence(sentence: string): string {
     }
     if (COPULA.has(word)) continue;
     if (IR_AUXILIARY.has(word)) {
-      // "vou estudar" → ESTUDAR (o futuro fica nos advérbios de tempo, como no VLibras).
-      if (!(next && isInfinitive(next))) output.push("IR", true);
+      // "vou estudar" → ESTUDAR (o futuro fica nos advérbios de tempo, como no VLibras);
+      // "vamos comemorar" é um convite: VAMOS.
+      if (word === "vamos" && next && isInfinitive(next)) output.push("VAMOS");
+      else if (!(next && isInfinitive(next))) output.push("IR", true);
       continue;
     }
 
-    const lemma = glossVerb(tokens, i, word);
-    const base = lemma ?? singular(word);
+    const lemma = glossVerb(tokens, i, word, vocabulary);
+    const previous = tokens[i - 1]?.word ?? "";
+    const adjective = COPULA.has(previous) || previous === "muito" || previous === "mais";
+    const base = lemma ?? nounForm(word, vocabulary, adjective);
     // Palavras compostas usam "_" como as expressões (GUARDA_CHUVA).
-    const gloss = (MASCULINE[base] ?? base).replaceAll("-", "_").toLocaleUpperCase("pt-BR");
-    output.push(gloss, lemma !== undefined);
+    output.push(toSign(base.replaceAll("-", "_")), lemma !== undefined);
   }
 
   return output.finish(marker);
 }
 
-/** Traduz português para glosa de Libras com regras locais, sem rede. */
-export function toGloss(text: string): string {
+/**
+ * Traduz português para glosa de Libras com regras locais. O dicionário de
+ * sinais (opcional) melhora verbos, expressões e formas das palavras.
+ */
+export function toGloss(text: string, vocabulary?: Vocabulary): string {
   const sentences = text.normalize("NFC").match(/[^.!?]+[.!?]*/g) ?? [];
-  return sentences.map(glossSentence).filter(Boolean).join(" ");
+  return sentences
+    .map((sentence) => glossSentence(sentence, vocabulary))
+    .filter(Boolean)
+    .join(" ");
 }
 
 export class RulesTranslator implements GlossTranslator {
   readonly name = "regras";
+  #vocabulary: Vocabulary | undefined;
+
+  constructor(vocabulary?: Vocabulary) {
+    this.#vocabulary = vocabulary;
+  }
+
+  /** Passa a usar o dicionário de sinais (carregado depois, em segundo plano). */
+  setVocabulary(vocabulary: Vocabulary | undefined): void {
+    this.#vocabulary = vocabulary;
+  }
 
   async translate(text: string): Promise<GlossResult> {
-    return { gloss: toGloss(text), source: this.name };
+    return { gloss: toGloss(text, this.#vocabulary), source: this.name };
   }
 }

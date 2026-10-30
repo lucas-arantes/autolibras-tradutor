@@ -10,6 +10,7 @@ O app usa estes serviços no navegador, mas não os redistribui.
 |---|---|---|
 | VLibras Widget (`https://vlibras.gov.br/app/vlibras-plugin.js`) | Avatar 3D (player Unity) carregado no navegador | Código LGPL-3.0 ([spbgovbr-vlibras](https://github.com/spbgovbr-vlibras)); avatares e runtime Unity sem licença aberta; [termos do VLibras](https://www.gov.br/governodigital/pt-br/acessibilidade-e-usuario/vlibras) |
 | Tradutor VLibras (`https://traducao2.vlibras.gov.br/translate`) | Tradução PT→glosa (opcional) | Serviço público sem API documentada, com os mesmos termos |
+| Lista de sinais do VLibras (`https://dicionario2.vlibras.gov.br/static/TREES/2018.3.1.json`) | Dicionário usado pelas regras locais, baixado uma vez e guardado no navegador | Dados do VLibras, com os mesmos termos; não ficam neste repositório |
 | Web Speech API | Reconhecimento de fala | Recurso do navegador; no Chrome, o Google processa o áudio |
 | Pacote de sinais do avatar próprio (`packages/avatar-three`, opcional) | Clipes de animação convertidos do [vlibras-dictionary-sources](https://gitlab.lavid.ufpb.br/vlibras-public/vlibras-dictionary/vlibras-dictionary-sources) (LAVID/UFPB), carregados por URL | GPL-3.0-or-later. Os clipes ficam fora deste repositório e são publicados à parte |
 

@@ -6,16 +6,25 @@ import {
   type Material,
   type Mesh,
   NeutralToneMapping,
+  type Object3D,
   PerspectiveCamera,
   PMREMGenerator,
   Scene,
+  type SkinnedMesh,
   Timer,
   Vector3,
   WebGLRenderer,
 } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { applyContacts, type ContactReport, type ContactSample } from "./contacts";
+import {
+  type BodySample,
+  type BodyVolume,
+  type CollisionReport,
+  fitBodyVolumes,
+  resolveCollisions,
+} from "./collision";
+import { applyContacts, type BoneLookup, type ContactReport, type ContactSample } from "./contacts";
 import type { Pose } from "./sign-pack";
 import type { AvatarStage } from "./vrm-renderer";
 
@@ -30,6 +39,8 @@ export interface ThreeVrmStageOptions {
   background?: string | null;
   /** Piscadas automáticas (só se o modelo tiver a expressão `blink`). */
   autoBlink?: boolean;
+  /** Tira as mãos e os antebraços de dentro do corpo (padrão: sim). */
+  collisions?: boolean;
 }
 
 /** Espaço de sinalização a enquadrar, em metros, em volta da cabeça e do quadril. */
@@ -51,12 +62,15 @@ export class ThreeVrmStage implements AvatarStage {
   #touched = new Set<string>();
   #span = { top: 1.8, bottom: 0.9 };
   #lastContacts?: ContactReport;
+  #lastCollisions?: CollisionReport;
+  #volumes: BodyVolume[] = [];
 
   constructor(options: ThreeVrmStageOptions) {
     this.#options = {
       ...options,
       background: options.background === undefined ? "#eef2f6" : options.background,
       autoBlink: options.autoBlink ?? true,
+      collisions: options.collisions ?? true,
     };
   }
 
@@ -71,6 +85,21 @@ export class ThreeVrmStage implements AvatarStage {
   /** Resultado da última correção de contatos (para diagnóstico). */
   get lastContacts(): ContactReport | undefined {
     return this.#lastContacts;
+  }
+
+  /** Resultado da última correção de colisões (para diagnóstico). */
+  get lastCollisions(): CollisionReport | undefined {
+    return this.#lastCollisions;
+  }
+
+  /** Volumes do corpo ajustados à malha do modelo. */
+  get volumes(): readonly BodyVolume[] {
+    return this.#volumes;
+  }
+
+  /** Liga ou desliga a correção de colisões das mãos com o corpo. */
+  setCollisions(enabled: boolean): void {
+    this.#options.collisions = enabled;
   }
 
   get expressionNames(): readonly string[] {
@@ -125,6 +154,10 @@ export class ThreeVrmStage implements AvatarStage {
     });
     this.#scene.add(vrm.scene);
     this.#vrm = vrm;
+    vrm.scene.updateMatrixWorld(true);
+    this.#volumes = fitBodyVolumes(vrmBodySamples(vrm), (name) =>
+      vrm.humanoid.getNormalizedBoneNode(name as never),
+    );
     if (vrm.lookAt) vrm.lookAt.target = this.#camera;
 
     this.#frame();
@@ -192,8 +225,15 @@ export class ThreeVrmStage implements AvatarStage {
     const renderer = this.#renderer;
     if (!vrm || !renderer) return;
     const bone = (name: string) => vrm.humanoid.getNormalizedBoneNode(name as never);
-    for (const [name, q] of pose) bone(name)?.quaternion.copy(q);
-    this.#lastContacts = contacts.length ? applyContacts(bone, vrm.scene, contacts) : undefined;
+    const result = poseSkeleton(
+      bone,
+      vrm.scene,
+      pose,
+      contacts,
+      this.#options.collisions ? this.#volumes : [],
+    );
+    this.#lastContacts = result.contacts;
+    this.#lastCollisions = result.collisions;
     const manager = vrm.expressionManager;
     if (manager) {
       for (const name of this.#touched) manager.setValue(name, 0);
@@ -249,4 +289,67 @@ export class ThreeVrmStage implements AvatarStage {
     this.#vrm = undefined;
     this.#renderer = undefined;
   }
+}
+
+/**
+ * Põe a pose nos ossos normalizados, corrige os contatos e depois as colisões com o corpo.
+ * É o que o palco faz a cada quadro antes de desenhar.
+ */
+export function poseSkeleton(
+  bone: BoneLookup,
+  root: Object3D,
+  pose: Pose,
+  contacts: readonly ContactSample[],
+  volumes: readonly BodyVolume[],
+): { contacts?: ContactReport; collisions?: CollisionReport } {
+  for (const [name, q] of pose) bone(name)?.quaternion.copy(q);
+  return {
+    contacts: contacts.length ? applyContacts(bone, root, contacts) : undefined,
+    collisions: volumes.length ? resolveCollisions(bone, root, volumes, contacts) : undefined,
+  };
+}
+
+/**
+ * Vértices das malhas do VRM na pose atual, cada um com o osso humanoide que mais pesa
+ * nele (ossos fora do humanoide, como os do cabelo, contam como o ancestral humanoide).
+ */
+export function vrmBodySamples(vrm: VRM): BodySample[] {
+  const humanoid = new Map<Object3D, string>();
+  for (const name of Object.keys(vrm.humanoid.humanBones)) {
+    const node = vrm.humanoid.getRawBoneNode(name as never);
+    if (node) humanoid.set(node, name);
+  }
+  const owner = (node: Object3D | null): string | undefined => {
+    for (let n = node; n; n = n.parent) {
+      const name = humanoid.get(n);
+      if (name) return name;
+    }
+    return undefined;
+  };
+  const samples: BodySample[] = [];
+  vrm.scene.traverse((obj) => {
+    const mesh = obj as SkinnedMesh;
+    if (!mesh.isSkinnedMesh) return;
+    const { skinIndex, skinWeight, position } = mesh.geometry.attributes;
+    if (!skinIndex || !skinWeight || !position) return;
+    const owners = mesh.skeleton.bones.map((b) => owner(b));
+    for (let i = 0; i < position.count; i++) {
+      let best = 0;
+      let index = 0;
+      for (let k = 0; k < skinIndex.itemSize; k++) {
+        const w = skinWeight.getComponent(i, k);
+        if (w > best) {
+          best = w;
+          index = skinIndex.getComponent(i, k);
+        }
+      }
+      const bone = owners[index];
+      if (!bone) continue;
+      const v = new Vector3();
+      mesh.getVertexPosition(i, v);
+      mesh.applyBoneTransform(i, v);
+      samples.push({ position: v.applyMatrix4(mesh.matrixWorld), bone });
+    }
+  });
+  return samples;
 }

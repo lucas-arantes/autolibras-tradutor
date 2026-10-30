@@ -8,7 +8,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CACHE="$(mkdir -p "${1:?uso: build_avatar.sh <cache-dir> [saida.vrm]}" && cd "$1" && pwd)"
-OUT="${2:-$HERE/../../demo/public/avatar/autolibras.vrm}"
+OUT="${2:-$HERE/../../assets/autolibras.vrm}"
 BLENDER="${BLENDER:-blender}"
 
 # nome|url|sha256

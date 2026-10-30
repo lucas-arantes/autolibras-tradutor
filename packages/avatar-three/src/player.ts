@@ -1,6 +1,6 @@
 import { Quaternion, Vector3 } from "three";
 import type { ContactSample } from "./contacts";
-import type { Pose, SignClip } from "./sign-pack";
+import type { FaceChannel, Pose, SignClip } from "./sign-pack";
 import type { ExpressionCueName, Segment, Timeline } from "./timeline";
 
 /** Suaviza o início e o fim do crossfade. */
@@ -62,8 +62,14 @@ export interface PlayerFrame {
   segment: Segment | undefined;
   /** Pesos das expressões (nomes das pistas, não do VRM). */
   expressions: Map<ExpressionCueName, number>;
+  /** Expressões gravadas nos próprios clipes (canais do rosto, já com o crossfade). */
+  face: Map<FaceChannel, number>;
   /** Giro da cabeça (rad) para os lados, do movimento de negação. */
   headYaw: number;
+  /** Inclinação da cabeça (rad, positivo abaixa o queixo), das perguntas. */
+  headPitch: number;
+  /** Deslocamento lateral da mão dominante (0 a 1), em letras repetidas. */
+  handShift: number;
   /** Contatos das mãos a corrigir com IK (já com os pesos do crossfade). */
   contacts: ContactSample[];
 }
@@ -94,12 +100,14 @@ export class TimelinePlayer {
     local: number,
     out: Pose,
     contacts: ContactSample[],
+    face: Map<FaceChannel, number>,
     weight: number,
   ): Pose {
     const clip = segment.clip ? this.#clips.get(segment.clip) : undefined;
     if (!clip) return copyPose(this.#initial, out);
     const time = segment.from + Math.min(local, segment.to - segment.from);
     clip.sampleContacts(time, weight, contacts);
+    clip.sampleFace(time, weight, face);
     return clip.sample(time, out);
   }
 
@@ -112,18 +120,20 @@ export class TimelinePlayer {
     if (index < 0) index = segments.length - 1;
     const segment = segments[index];
     const contacts: ContactSample[] = [];
+    const face = new Map<FaceChannel, number>();
     if (segment) {
       const into = t - segment.start;
       if (into < segment.blend) {
         const u = smoothstep(into / segment.blend);
         const prev = segments[index - 1];
         const a = prev
-          ? this.#sampleSegment(prev, Number.POSITIVE_INFINITY, this.#a, contacts, 1 - u)
+          ? this.#sampleSegment(prev, Number.POSITIVE_INFINITY, this.#a, contacts, face, 1 - u)
           : this.#initial;
-        const b = this.#sampleSegment(segment, 0, this.#b, contacts, u);
+        const b = this.#sampleSegment(segment, 0, this.#b, contacts, face, u);
         blendPoses(a, b, u, out);
       } else {
-        this.#sampleSegment(segment, (into - segment.blend) * segment.rate, out, contacts, 1);
+        const local = (into - segment.blend) * segment.rate;
+        this.#sampleSegment(segment, local, out, contacts, face, 1);
       }
     } else {
       copyPose(this.#initial, out);
@@ -135,27 +145,50 @@ export class TimelinePlayer {
       if (w > (expressions.get(cue.name) ?? 0)) expressions.set(cue.name, w);
     }
     let headYaw = 0;
+    let headPitch = 0;
     for (const cue of this.timeline.head) {
       const w = envelope(t, cue.start, cue.end);
+      if (w <= 0) continue;
       // Balanço de ~2,5 Hz e 12°, como um "não" com a cabeça.
-      if (w > 0) headYaw += w * 0.21 * Math.sin(2 * Math.PI * 2.5 * (t - cue.start));
+      if (cue.kind === "shake") headYaw += w * 0.21 * Math.sin(2 * Math.PI * 2.5 * (t - cue.start));
+      else headPitch += w * (cue.pitch ?? 0);
     }
-    return { segment, expressions, headYaw, contacts };
+    let handShift = 0;
+    for (const cue of this.timeline.hand) {
+      handShift = Math.max(handShift, envelope(t, cue.start, cue.end));
+    }
+    return { segment, expressions, face, headYaw, headPitch, handShift, contacts };
   }
 }
 
-/** Soma o giro da cabeça à pose (parte no pescoço, parte na cabeça). */
-export function applyHeadYaw(pose: Pose, yaw: number): void {
-  if (yaw === 0) return;
+/** Soma o giro e a inclinação da cabeça à pose (parte no pescoço, parte na cabeça). */
+export function applyHeadTurn(pose: Pose, yaw: number, pitch = 0): void {
+  if (yaw === 0 && pitch === 0) return;
   for (const [bone, share] of [
     ["neck", 0.4],
     ["head", 0.6],
   ] as const) {
     const turn = new Quaternion().setFromAxisAngle(UP, yaw * share);
+    if (pitch !== 0) turn.premultiply(new Quaternion().setFromAxisAngle(RIGHT, pitch * share));
     const q = pose.get(bone);
     if (q) q.multiply(turn);
     else pose.set(bone, turn);
   }
+}
+
+/** Giro do braço (rad) que leva a mão dominante uns 3 cm para fora numa letra repetida. */
+const HAND_SHIFT = 0.12;
+
+/**
+ * Desloca a mão direita para fora (letra ou algarismo repetido, como em `ANNA` ou `11`):
+ * gira o braço em torno da vertical, no referencial do ombro.
+ */
+export function applyHandShift(pose: Pose, amount: number): void {
+  if (amount <= 0) return;
+  const turn = new Quaternion().setFromAxisAngle(UP, -HAND_SHIFT * amount);
+  const q = pose.get("rightUpperArm");
+  if (q) q.premultiply(turn);
+  else pose.set("rightUpperArm", turn);
 }
 
 /**

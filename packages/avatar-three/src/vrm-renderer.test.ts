@@ -42,7 +42,19 @@ function rotationClip(name: string, duration: number, a: number, b: number): Ani
           new VectorKeyframeTrack("contact_right_chest_indexTip.scale", [0], [1, 1, 1]),
         ]
       : [];
-  return new AnimationClip(name, duration, [track, ...contact]);
+  // OI tem bico (oralização) e sobrancelhas franzidas gravados no clipe.
+  const face =
+    name === "OI"
+      ? [
+          new VectorKeyframeTrack(
+            "face_pucker.scale",
+            [0, duration],
+            [0.8, 0.8, 0.8, 0.8, 0.8, 0.8],
+          ),
+          new VectorKeyframeTrack("face_browFrown.scale", [0], [1, 1, 1]),
+        ]
+      : [];
+  return new AnimationClip(name, duration, [track, ...contact, ...face]);
 }
 
 function angleOf(pose: Pose, bone = "leftUpperArm"): number {
@@ -55,6 +67,7 @@ const CLIPS: Record<string, [number, number, number, number, number]> = {
   CASA: [2, 0.5, 1.5, 0, 90],
   EU: [2, 0.5, 1.5, 0, 45],
   A: [1, 0.3, 0.7, 0, 20],
+  OI: [2, 0.5, 1.5, 0, 30],
 };
 
 function fakePack(): SignPack {
@@ -62,7 +75,7 @@ function fakePack(): SignPack {
     format: "autolibras-sign-pack",
     version: 1,
     skeleton: "vrm-humanoid-normalized",
-    license: "GPL-3.0-or-later",
+    license: "GPL-3.0-only",
     rest: "CASA",
     signs: Object.fromEntries(
       Object.entries(CLIPS).map(([name, [duration, strokeStart, strokeEnd]]) => [
@@ -137,9 +150,9 @@ class FakeStage implements AvatarStage {
   }
 }
 
-async function setup(expressions?: string[]) {
+async function setup(expressions?: string[], faceWeight?: number) {
   const stage = new FakeStage(expressions);
-  const renderer = new VrmRenderer({ signs: fakePack(), stage });
+  const renderer = new VrmRenderer({ signs: fakePack(), stage, faceWeight });
   await renderer.load();
   return { stage, renderer };
 }
@@ -323,6 +336,59 @@ describe("VrmRenderer (contrato do AvatarRenderer)", () => {
     await play;
     await stage.advance(0.1);
     expect(stage.last.expressions.size).toBe(0);
+  });
+
+  it("toca as expressões gravadas no clipe com as expressões do modelo", async () => {
+    const { stage, renderer } = await setup(["mouthPucker", "browDown", "browUp"]);
+    const play = renderer.play("OI");
+    await flush();
+    await stage.advance(0.8);
+    expect(stage.last.expressions.get("mouthPucker")).toBeCloseTo(0.8 * 0.9);
+    expect(stage.last.expressions.get("browDown")).toBeCloseTo(0.9);
+    renderer.setFaceWeight(0);
+    await stage.advance(1 / 60);
+    expect(stage.last.expressions.size).toBe(0);
+    renderer.stop();
+    await play;
+  });
+
+  it("cai na expressão alternativa e deixa a pergunta mandar nas sobrancelhas", async () => {
+    const { stage, renderer } = await setup(["ou", "browDown", "browUp"]);
+    const play = renderer.play("OI [INTERROGAÇÃO]");
+    await flush();
+    await stage.advance(1);
+    // Sem `mouthPucker`, o bico usa o visema `ou`.
+    expect(stage.last.expressions.get("ou")).toBeCloseTo(0.8 * 0.7);
+    // A pergunta sim/não ergue as sobrancelhas; o franzido do sinal some.
+    expect(stage.last.expressions.get("browUp")).toBeCloseTo(1);
+    expect(stage.last.expressions.get("browDown") ?? 0).toBeLessThan(0.01);
+    renderer.stop();
+    await play;
+  });
+
+  it("inclina a cabeça na pergunta", async () => {
+    const { stage, renderer } = await setup();
+    const play = renderer.play("CASA [INTERROGAÇÃO]");
+    await flush();
+    await stage.advance(1);
+    expect(angleOf(stage.last.pose, "head")).toBeGreaterThan(2);
+    renderer.stop();
+    await play;
+  });
+
+  it("desliza a mão direita na letra repetida", async () => {
+    const { stage, renderer } = await setup();
+    const play = renderer.play("AA");
+    await flush();
+    const angles: number[] = [];
+    for (let i = 0; i < 90; i++) {
+      await stage.advance(1 / 60);
+      angles.push(angleOf(stage.last.pose, "rightUpperArm"));
+    }
+    expect(Math.max(...angles)).toBeGreaterThan(5);
+    expect(angles[0]).toBeLessThan(0.5);
+    renderer.stop();
+    await play;
   });
 
   it("balança a cabeça na negação", async () => {

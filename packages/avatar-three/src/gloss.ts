@@ -123,3 +123,46 @@ export function fingerspellLetters(word: string): string[] {
   }
   return letters;
 }
+
+/** Letra soletrada isolada na glosa (`A`, `Ç`), como nos nomes próprios: `NOME A N A`. */
+export function isLetterToken(token: SignToken): boolean {
+  return token.raw === token.base && /^[A-ZÇ]$/u.test(token.base);
+}
+
+/** Separador de milhar: `1.500`, `2.000.000`. */
+const THOUSANDS = /^\d{1,3}(\.\d{3})+$/;
+const NUMBER = /^\d+(,\d+)?$/;
+
+/**
+ * Sinais para escrever um número em Libras, ou `null` se o token não for um número.
+ *
+ * Até quatro algarismos (`25`, `2010`), o número é sinalizado algarismo por algarismo,
+ * como se faz com anos, idades e horas. A partir de cinco, os grupos de milhar ganham
+ * os sinais `MIL` e `MILHÃO` (`25000` → `2 5 MIL`); grupos zerados são pulados. A parte
+ * decimal vem depois de `VÍRGULA`.
+ */
+export function numberSigns(text: string): string[] | null {
+  const plain = THOUSANDS.test(text) ? text.replaceAll(".", "") : text;
+  if (!NUMBER.test(plain)) return null;
+  const [integer = "", fraction] = plain.split(",");
+  const out: string[] = [];
+  if (integer.length <= 4) {
+    out.push(...integer);
+  } else {
+    const digits = integer.replace(/^0+(?=\d)/, "");
+    const groups: Array<[string, string | null]> = [
+      [digits.slice(0, -6), "MILHÃO"],
+      [digits.slice(-6, -3), "MIL"],
+      [digits.slice(-3), null],
+    ];
+    for (const [group, word] of groups) {
+      const value = group.replace(/^0+/, "");
+      if (!value) continue;
+      out.push(...value);
+      if (word) out.push(word);
+    }
+    if (out.length === 0) out.push("0");
+  }
+  if (fraction) out.push("VÍRGULA", ...fraction);
+  return out;
+}

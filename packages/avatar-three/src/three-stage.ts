@@ -23,7 +23,10 @@ export interface ThreeVrmStageOptions {
   canvas: HTMLCanvasElement;
   /** URL do modelo `.vrm`. */
   avatarUrl: string;
-  /** Cor de fundo; `null` deixa o canvas transparente. */
+  /**
+   * Cor de fundo (CSS). `null` ou `"transparent"` deixam o canvas transparente, para
+   * desenhar o avatar por cima de outra coisa (overlay do OBS, por exemplo).
+   */
   background?: string | null;
   /** Piscadas automáticas (só se o modelo tiver a expressão `blink`). */
   autoBlink?: boolean;
@@ -50,7 +53,11 @@ export class ThreeVrmStage implements AvatarStage {
   #lastContacts?: ContactReport;
 
   constructor(options: ThreeVrmStageOptions) {
-    this.#options = { background: "#eef2f6", autoBlink: true, ...options };
+    this.#options = {
+      ...options,
+      background: options.background === undefined ? "#eef2f6" : options.background,
+      autoBlink: options.autoBlink ?? true,
+    };
   }
 
   get vrm(): VRM | undefined {
@@ -72,13 +79,16 @@ export class ThreeVrmStage implements AvatarStage {
 
   async load(): Promise<void> {
     if (this.#vrm) return;
-    const { canvas, avatarUrl, background } = this.#options;
-    const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: background === null });
+    const { canvas, avatarUrl } = this.#options;
+    // Com alpha sempre ligado, o fundo pode virar transparente depois (setBackground).
+    // A cor sai pré-multiplicada pelo alfa, como o OBS e os navegadores esperam.
+    const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0);
     // Neutral (Khronos PBR Neutral) preserva matiz e saturação: o tom de pele não muda.
     renderer.toneMapping = NeutralToneMapping;
     this.#renderer = renderer;
-    if (background) this.#scene.background = new Color(background);
+    this.setBackground(this.#options.background ?? null);
     // Luz de estúdio suave: o ambiente refletido (pele e olhos) e o hemisfério preenchem as
     // sombras; a luz principal modela o rosto e a contraluz separa cabelo e mãos do fundo.
     const pmrem = new PMREMGenerator(renderer);
@@ -121,6 +131,18 @@ export class ThreeVrmStage implements AvatarStage {
     this.#resize = new ResizeObserver(() => this.#fit());
     this.#resize.observe(canvas);
     this.#fit();
+  }
+
+  /** Troca a cor de fundo; `null` ou `"transparent"` deixam o canvas transparente. */
+  setBackground(background: string | null): void {
+    const transparent = background === null || background === "transparent";
+    this.#options.background = transparent ? null : background;
+    this.#scene.background = transparent ? null : new Color(background);
+  }
+
+  /** O canvas está com fundo transparente. */
+  get transparent(): boolean {
+    return this.#options.background === null;
   }
 
   /** Mede o espaço de sinalização: do alto da cabeça ao quadril. */

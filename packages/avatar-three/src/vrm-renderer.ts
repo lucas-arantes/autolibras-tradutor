@@ -1,8 +1,8 @@
 import { type AvatarRenderer, Emitter } from "@autolibras/core";
 import { Quaternion } from "three";
 import type { ContactSample } from "./contacts";
-import { applyBreathing, applyHeadYaw, copyPose, TimelinePlayer } from "./player";
-import { type Pose, type SignClip, SignPack } from "./sign-pack";
+import { applyBreathing, applyHandShift, applyHeadTurn, copyPose, TimelinePlayer } from "./player";
+import { type FaceChannel, type Pose, type SignClip, SignPack } from "./sign-pack";
 import {
   type ExpressionCueName,
   planGloss,
@@ -26,6 +26,8 @@ export interface AvatarStage {
   ): void;
   /** Chama `tick(dt)` a cada quadro e devolve a função que para o laço. */
   start(tick: (dt: number) => void): () => void;
+  /** Troca o fundo; `null` deixa transparente (opcional). */
+  setBackground?(background: string | null): void;
   dispose(): void;
 }
 
@@ -36,6 +38,64 @@ export const EXPRESSION_FALLBACKS: Record<ExpressionCueName, string[]> = {
   surprised: ["surprised", "happy"],
   intense: ["browDown", "angry"],
 };
+
+/**
+ * Expressões VRM para cada canal do rosto gravado nos clipes, em ordem de preferência,
+ * com o ganho de cada uma. O modelo do AutoLibras tem todas as primeiras; outros VRMs
+ * caem nas alternativas mais próximas que tiverem (ou ignoram o canal).
+ */
+export const FACE_EXPRESSIONS: Record<FaceChannel, Array<[string, number]>> = {
+  browRaise: [
+    ["browUp", 1],
+    ["surprised", 0.5],
+  ],
+  browOuterUp: [
+    ["browUp", 0.7],
+    ["surprised", 0.35],
+  ],
+  browLower: [
+    ["browDown", 0.8],
+    ["angry", 0.4],
+  ],
+  browFrown: [
+    ["browDown", 0.9],
+    ["angry", 0.5],
+  ],
+  browAngry: [
+    ["browDown", 0.7],
+    ["angry", 0.4],
+  ],
+  smile: [
+    ["mouthSmile", 1],
+    ["happy", 0.7],
+  ],
+  frown: [
+    ["mouthFrown", 1],
+    ["sad", 0.6],
+  ],
+  pucker: [
+    ["mouthPucker", 0.9],
+    ["ou", 0.7],
+  ],
+  lipPress: [["mouthPress", 1]],
+  upperLip: [],
+  cheekPuff: [["cheekPuff", 1]],
+  cheekSuck: [
+    ["cheekSuck", 1],
+    ["ou", 0.4],
+  ],
+  jawOpen: [["aa", 0.8]],
+};
+
+/** Canais de sobrancelha: cedem lugar às pistas gramaticais de pergunta. */
+const BROW_CHANNELS = new Set<FaceChannel>([
+  "browRaise",
+  "browOuterUp",
+  "browLower",
+  "browFrown",
+  "browAngry",
+]);
+const BROW_CUES = new Set<ExpressionCueName>(["browUp", "browDown"]);
 
 export interface SignEvent {
   unit: SignUnit;
@@ -63,6 +123,11 @@ export interface VrmRendererOptions {
   contacts?: boolean;
   /** Respiração sutil, também durante a sinalização (padrão: sim). */
   breathing?: boolean;
+  /**
+   * Peso das expressões gravadas nos clipes (boca, bochechas, sobrancelhas), de 0 a 1
+   * (padrão: 1). Zero deixa só as pistas gramaticais (perguntas, negação).
+   */
+  faceWeight?: number;
 }
 
 interface ActivePlay {
@@ -100,6 +165,8 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
   #breathing: boolean;
   readonly #rest: Pose = new Map();
   #expressionMap = new Map<ExpressionCueName, string>();
+  #faceMap = new Map<FaceChannel, [string, number]>();
+  #faceWeight: number;
 
   constructor(options: VrmRendererOptions) {
     super();
@@ -109,6 +176,7 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
     this.#settle = options.settleSeconds ?? 0.12;
     this.#contacts = options.contacts ?? true;
     this.#breathing = options.breathing ?? true;
+    this.#faceWeight = clamp01(options.faceWeight ?? 1);
   }
 
   get speed(): number {
@@ -133,6 +201,10 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
     for (const [cue, names] of Object.entries(EXPRESSION_FALLBACKS)) {
       const name = names.find((n) => available.has(n));
       if (name) this.#expressionMap.set(cue as ExpressionCueName, name);
+    }
+    for (const [channel, options] of Object.entries(FACE_EXPRESSIONS)) {
+      const found = options.find(([n]) => available.has(n));
+      if (found) this.#faceMap.set(channel as FaceChannel, found);
     }
     const rest = this.pack.rest;
     if (rest) {
@@ -190,6 +262,16 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
     this.#speed = Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed));
   }
 
+  /** Troca o fundo do palco; `null` ou `"transparent"` deixam o canvas transparente. */
+  setBackground(background: string | null): void {
+    this.#stage.setBackground?.(background);
+  }
+
+  /** Peso das expressões gravadas nos clipes (0 desliga, 1 é o padrão). */
+  setFaceWeight(weight: number): void {
+    if (Number.isFinite(weight)) this.#faceWeight = clamp01(weight);
+  }
+
   /** Liga ou desliga a correção de contatos (útil para comparar). */
   setContacts(enabled: boolean): void {
     this.#contacts = enabled;
@@ -226,11 +308,24 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
           total: segments.length,
         });
       }
-      applyHeadYaw(this.#pose, frame.headYaw);
+      applyHeadTurn(this.#pose, frame.headYaw, frame.headPitch);
+      applyHandShift(this.#pose, frame.handShift);
       if (this.#contacts) contacts = frame.contacts;
+      let browCue = 0;
       for (const [cue, weight] of frame.expressions) {
+        if (BROW_CUES.has(cue)) browCue = Math.max(browCue, weight);
         const name = this.#expressionMap.get(cue);
         if (name) expressions.set(name, Math.max(weight, expressions.get(name) ?? 0));
+      }
+      // Expressões do próprio sinal. Numa pergunta, as sobrancelhas seguem a gramática
+      // da frase, e as do sinal só entram no que sobrar.
+      for (const [channel, weight] of frame.face) {
+        const target = this.#faceMap.get(channel);
+        if (!target) continue;
+        const [name, gain] = target;
+        const scale = BROW_CHANNELS.has(channel) ? 1 - browCue : 1;
+        const w = weight * gain * scale * this.#faceWeight;
+        if (w > 1e-3) expressions.set(name, Math.min(1, Math.max(w, expressions.get(name) ?? 0)));
       }
       if (active.time >= active.player.duration && active.id === this.#playId) this.#finish();
     } else {
@@ -253,3 +348,7 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
 }
 
 const IDENTITY = new Quaternion();
+
+function clamp01(x: number): number {
+  return Math.min(1, Math.max(0, x));
+}

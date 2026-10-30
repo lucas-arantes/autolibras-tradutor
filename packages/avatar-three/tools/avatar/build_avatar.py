@@ -13,7 +13,8 @@
 #   - VRM 1.0, modelo olhando para +Z no glTF (-Y no Blender);
 #   - pose de repouso em T: braços em ±X, palmas para baixo, dedos retos em ±X,
 #     polegares a 45° entre ±X e a frente, pernas retas para baixo;
-#   - expressões por shape keys: presets VRM + "browUp" e "browDown".
+#   - expressões por shape keys: presets VRM + "browUp", "browDown" e as de boca e
+#     bochechas usadas pelos clipes (veja CUSTOM).
 
 import argparse
 import json
@@ -133,11 +134,20 @@ EXPRESSIONS = {
                "eyeWideLeft": 0.5, "eyeWideRight": 0.5},
     "browDown": {"browDownLeft": 1.0, "browDownRight": 1.0, "eyeSquintLeft": 0.5,
                  "eyeSquintRight": 0.5, "noseSneerLeft": 0.2, "noseSneerRight": 0.2},
+    # Boca e bochechas dos sinais (expressões não manuais gravadas nos clipes do VLibras).
+    "mouthSmile": {"mouthSmileLeft": 1.0, "mouthSmileRight": 1.0, "cheekSquintLeft": 0.3,
+                   "cheekSquintRight": 0.3},
+    "mouthFrown": {"mouthFrownLeft": 1.0, "mouthFrownRight": 1.0, "mouthShrugLower": 0.3},
+    "mouthPucker": {"mouthPucker": 1.0, "mouthFunnel": 0.3},
+    "mouthPress": {"mouthPressLeft": 1.0, "mouthPressRight": 1.0, "mouthRollLower": 0.3},
+    "cheekPuff": {"cheekPuff": 1.0, "mouthClose": 0.2},
+    "cheekSuck": {"mouthPucker": 0.6, "mouthRollLower": 0.3, "mouthRollUpper": 0.3},
 }
 PRESETS = {"happy": "happy", "angry": "angry", "sad": "sad", "surprised": "surprised",
            "relaxed": "relaxed", "blink": "blink", "blinkLeft": "blink_left",
            "blinkRight": "blink_right", "aa": "aa", "ih": "ih", "ou": "ou", "ee": "ee", "oh": "oh"}
-CUSTOM = ["browUp", "browDown"]
+CUSTOM = ["browUp", "browDown", "mouthSmile", "mouthFrown", "mouthPucker", "mouthPress",
+          "cheekPuff", "cheekSuck"]
 
 # Ossos mantidos do rig "default" do MPFB; o resto (face, dedos dos pés, seios)
 # tem os pesos somados ao ancestral mantido mais próximo.

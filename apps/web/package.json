@@ -12,6 +12,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
+    "@autolibras/avatar-three": "*",
     "@autolibras/core": "*",
     "@autolibras/gloss-rules": "*",
     "@autolibras/stt-web": "*",

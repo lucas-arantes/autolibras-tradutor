@@ -53,6 +53,9 @@
         border: 1px solid var(--border);
         display: block;
       }
+      canvas.transparent {
+        background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0 / 24px 24px;
+      }
       section {
         background: var(--panel);
         border: 1px solid var(--border);
@@ -74,6 +77,16 @@
         min-height: 4.5em;
         font: 1rem ui-monospace, monospace;
         padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+      }
+      input[type="search"] {
+        width: 100%;
+        box-sizing: border-box;
+        font: inherit;
+        padding: 6px 8px;
         border-radius: 8px;
         border: 1px solid var(--border);
         background: var(--bg);
@@ -135,7 +148,8 @@
         <h1>Avatar VRM do AutoLibras</h1>
         <p>
           Digite uma glosa (formato do VLibras) e veja o avatar sinalizar. Palavras sem sinal no
-          pacote são soletradas; se faltar a letra, aparece um aviso.
+          pacote são soletradas, e números saem algarismo por algarismo; se faltar a letra,
+          aparece um aviso.
         </p>
         <textarea id="gloss" spellcheck="false">OI [EXCLAMAÇÃO] EU NOME A N A [PONTO]</textarea>
         <div class="row">
@@ -144,10 +158,13 @@
           <label>Velocidade <input id="speed" type="range" min="0.5" max="2" step="0.25" value="1" /></label>
           <output id="speed-value">1×</output>
           <label><input id="contacts" type="checkbox" checked /> Corrigir contatos</label>
+          <label><input id="face" type="checkbox" checked /> Expressões do sinal</label>
+          <label><input id="transparent" type="checkbox" /> Fundo transparente</label>
         </div>
         <div class="row" id="examples"></div>
         <div id="status">Carregando…</div>
         <p><small id="pack-info"></small></p>
+        <input id="filter" type="search" placeholder="Procurar sinal" aria-label="Procurar sinal" />
         <div class="row chips" id="signs"></div>
       </section>
     </main>

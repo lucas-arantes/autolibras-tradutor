@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Guia técnico do AutoLibras: tradutor no navegador, servidor com Docker, overlay no OBS, live com a janela de Libras, vídeos com legenda e API."
+    />
+    <meta name="theme-color" content="#0f6e78" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>AutoLibras · como usar</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <img src="/icon.svg" alt="" width="36" height="36" />
+          <div>
+            <h1>Como usar</h1>
+            <p>Guia técnico, do navegador à live com a janela de Libras</p>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main class="guide">
+      <nav class="card toc" aria-label="Nesta página">
+        <h2>Nesta página</h2>
+        <ol>
+          <li><a href="#caminhos">Qual caminho usar</a></li>
+          <li><a href="#navegador">Tradutor no navegador</a></li>
+          <li><a href="#servidor">Servidor com Docker</a></li>
+          <li><a href="#obs">Overlay no OBS</a></li>
+          <li><a href="#janela">Live com a janela de Libras embutida</a></li>
+          <li><a href="#videos">Libras nos vídeos do seu site</a></li>
+          <li><a href="#api">API para outros sistemas</a></li>
+          <li><a href="#extensao">Extensão do Chrome</a></li>
+          <li><a href="#limites">Privacidade e limites</a></li>
+        </ol>
+      </nav>
+
+      <section id="caminhos" class="card">
+        <h2>Qual caminho usar</h2>
+        <p>
+          Todos os caminhos fazem o mesmo trabalho: a fala vira texto, o texto vira glosa de
+          Libras e o avatar sinaliza a glosa. O que muda é de onde vem o texto e onde o avatar
+          aparece.
+        </p>
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Você quer</th>
+                <th scope="col">Use</th>
+                <th scope="col">Precisa de</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Ver em Libras o que você fala ou digita</td>
+                <td><a href="./">Tradutor</a>, neste site</td>
+                <td>Navegador com WebGL</td>
+              </tr>
+              <tr>
+                <td>Pôr o avatar na sua live pelo OBS</td>
+                <td>Servidor, <a href="#obs">Estúdio e overlay</a></td>
+                <td>Docker e OBS 28 ou mais recente</td>
+              </tr>
+              <tr>
+                <td>Mandar a live para o YouTube ou a Twitch já com a janela de Libras</td>
+                <td><a href="#janela">Composição no servidor</a></td>
+                <td>Docker e um processador com folga</td>
+              </tr>
+              <tr>
+                <td>Pôr um botão Libras no player de vídeo do seu site</td>
+                <td><a href="#videos"><code>closed-signing.js</code></a></td>
+                <td>Vídeo com legenda em português</td>
+              </tr>
+              <tr>
+                <td>Mandar texto de um sistema de legendas ou estenotipia</td>
+                <td><a href="#api">API das sessões</a></td>
+                <td>Servidor</td>
+              </tr>
+              <tr>
+                <td>Traduzir o áudio de outra aba (YouTube, Meet)</td>
+                <td><a href="#extensao">Extensão do Chrome</a></td>
+                <td>Servidor e Chrome</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="navegador" class="card">
+        <h2>Tradutor no navegador</h2>
+        <p>
+          Abra o <a href="./">Tradutor</a>, clique em <strong>Começar a ouvir</strong> e fale, ou
+          digite uma frase. A
+          legenda aparece enquanto você fala, e o avatar sinaliza cada frase quando ela termina.
+          O avatar leva alguns segundos para carregar na primeira vez.
+        </p>
+        <p>
+          Em <strong>Configurações</strong> você escolhe cada etapa. O reconhecimento de fala
+          pode ser o do navegador, a Web Speech API do Chrome, do Edge e do Safari (no Chrome, o
+          áudio vai para os servidores do Google), ou o
+          <a href="#servidor">servidor do AutoLibras</a>, que pode rodar no seu computador, no
+          endereço <code>ws://localhost:8000/v1/stream</code>.
+        </p>
+        <p>
+          O tradutor do VLibras gera a glosa nos servidores dele e, se falhar ou demorar mais de
+          4 segundos, o app usa as regras locais. Com as regras locais escolhidas, a tradução
+          roda no próprio navegador e o texto não sai dele.
+        </p>
+        <p>
+          O avatar próprio é um modelo 3D aberto que sinaliza com o
+          <a href="https://github.com/lucas-arantes/autolibras-sinais">pacote de sinais</a>
+          publicado à parte. O do VLibras é carregado dos servidores do governo.
+        </p>
+        <p>
+          A fala costuma ser mais rápida que a sinalização, então as frases passam por uma fila.
+          Quando o atraso cresce, o avatar acelera; se passar do limite, as frases mais antigas
+          saem da fila, mas continuam na legenda e no histórico.
+        </p>
+      </section>
+
+      <section id="servidor" class="card">
+        <h2>Servidor com Docker</h2>
+        <p>
+          O servidor transcreve a fala com o Whisper e serve o app, o Estúdio e o overlay. Com o
+          Docker instalado, salve o
+          <a href="https://raw.githubusercontent.com/lucas-arantes/autolibras-tradutor/main/docker-compose.yml"
+            ><code>docker-compose.yml</code></a
+          >
+          numa pasta e rode, nela:
+        </p>
+        <pre><code>docker compose up -d</code></pre>
+        <p>
+          Na primeira vez, o Docker baixa a imagem e o servidor baixa o modelo
+          <code>small</code> (cerca de 480 MB). Depois ele sobe em segundos e volta sozinho
+          quando o computador reinicia. Confira em
+          <code>http://localhost:8000/health</code>, que deve responder
+          <code>"status":"ok"</code>. Para atualizar, rode <code>docker compose pull</code> e
+          <code>docker compose up -d</code>.
+        </p>
+        <h3>GPU e servidor na internet</h3>
+        <p>
+          Com uma GPU NVIDIA e o NVIDIA Container Toolkit, a imagem <code>gpu</code> usa o
+          modelo <code>large-v3-turbo</code>, que erra menos:
+        </p>
+        <pre><code>docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d</code></pre>
+        <p>
+          Para um servidor na internet, o <code>docker-compose.hosted.yml</code> põe o Caddy na
+          frente, com HTTPS, e exige senha. O
+          <a href="https://github.com/lucas-arantes/autolibras-tradutor/blob/main/docs/hospedagem.md"
+            >guia de hospedagem</a
+          >
+          tem o passo a passo e os custos por hora.
+        </p>
+        <h3>Configuração</h3>
+        <p>Tudo se ajusta por variáveis de ambiente. As mais usadas:</p>
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Variável</th>
+                <th scope="col">O que faz</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AUTOLIBRAS_MODEL</code></td>
+                <td>
+                  Modelo Whisper: <code>tiny</code>, <code>base</code>, <code>small</code>
+                  (padrão), <code>medium</code>, <code>large-v3</code>,
+                  <code>large-v3-turbo</code>. Se o avatar fica muito atrás da fala, use um menor.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AUTOLIBRAS_TOKEN</code></td>
+                <td>
+                  Senha para criar sessões e enviar áudio ou texto. Defina sempre que o servidor
+                  estiver acessível pela rede.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AUTOLIBRAS_SIGNS_DIR</code></td>
+                <td>
+                  Pasta com um pacote de sinais local, para não depender da internet. No
+                  <code>docker-compose.yml</code>, basta descomentar a linha da pasta
+                  <code>sinais</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AUTOLIBRAS_DATA_DIR</code></td>
+                <td>Onde fica o retorno do público (<code>feedback.jsonl</code>).</td>
+              </tr>
+              <tr>
+                <td><code>AUTOLIBRAS_RTMP_PORT</code></td>
+                <td>Porta em que o servidor recebe o RTMP do OBS (padrão 1935).</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          A lista completa está no
+          <a href="https://github.com/lucas-arantes/autolibras-tradutor/blob/main/services/stt-server/README.md"
+            >README do servidor</a
+          >. Numa CPU de 12 threads, o modelo <code>small</code> acompanhou a fala; os modelos
+          maiores precisam de GPU.
+        </p>
+      </section>
+
+      <section id="obs" class="card">
+        <h2>Overlay no OBS</h2>
+        <ol class="steps">
+          <li>
+            Com o servidor no ar, abra o Estúdio em
+            <code>http://localhost:8000/studio.html</code>.
+          </li>
+          <li>
+            Em <strong>Fonte da tradução</strong>, escolha de onde vem o som:
+            <ul>
+              <li>
+                <strong>Dispositivo de áudio</strong>: microfone, mesa de som ou placa de
+                captura. Para o som que só existe dentro do OBS, mande o monitor de áudio para um
+                cabo virtual (VB-CABLE, BlackHole ou um <code>null-sink</code> do PipeWire). A aba
+                do Estúdio fica aberta durante a live.
+              </li>
+              <li>
+                <strong>Endereço da transmissão</strong>: o servidor lê
+                <code>rtmp://</code>, <code>srt://</code> ou HLS (<code>.m3u8</code>) com o
+                ffmpeg. Marque <strong>Usar a legenda da transmissão</strong> para seguir a
+                legenda WebVTT ou o closed caption (CEA-608) em vez da fala.
+              </li>
+              <li><strong>Texto</strong>: digitado no Estúdio ou enviado pela <a href="#api">API</a>.</li>
+            </ul>
+          </li>
+          <li>Clique em <strong>Iniciar tradução</strong>.</li>
+          <li>
+            Em <strong>Overlay no OBS</strong>, clique em <strong>Copiar</strong>. No OBS,
+            acrescente uma fonte <strong>Navegador</strong>, cole o endereço e use 400 de largura
+            por 600 de altura. O endereço não muda de uma live para outra.
+          </li>
+        </ol>
+        <p>
+          O avatar sinaliza cerca de 2 segundos depois do fim de cada frase, num teste em CPU com
+          o modelo <code>small</code>. Na fala corrida, uma frase sai assim que termina em ponto,
+          sem esperar a pausa.
+        </p>
+        <h3>Parâmetros do overlay</h3>
+        <p>
+          O Estúdio monta o endereço de <code>broadcast.html</code>, mas dá para ajustar à mão:
+        </p>
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Parâmetro</th>
+                <th scope="col">O que faz</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>session</code></td>
+                <td>Id da sessão (obrigatório). Funciona como chave: quem tem o id acompanha a sessão.</td>
+              </tr>
+              <tr>
+                <td><code>legenda=1</code></td>
+                <td>Mostra embaixo do avatar a frase que está sendo sinalizada.</td>
+              </tr>
+              <tr>
+                <td><code>atraso=N</code></td>
+                <td>
+                  Modo sincronizado: cada frase começa N segundos depois de ter sido dita, para
+                  acompanhar um vídeo atrasado do mesmo tanto. O Estúdio mede o tempo das frases
+                  e sugere o valor.
+                </td>
+              </tr>
+              <tr>
+                <td><code>bg</code></td>
+                <td>Fundo: <code>transparent</code> (padrão) ou uma cor CSS.</td>
+              </tr>
+              <tr>
+                <td><code>signs</code></td>
+                <td>Outro pacote de sinais (pasta com <code>manifest.json</code>).</td>
+              </tr>
+              <tr>
+                <td><code>status=1</code></td>
+                <td>Mostra o estado da conexão, para achar o problema quando nada aparece.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          O passo a passo completo, com os problemas comuns, está em
+          <a href="https://github.com/lucas-arantes/autolibras-tradutor/blob/main/docs/transmissoes-obs.md"
+            >Libras na sua live com o OBS</a
+          >.
+        </p>
+      </section>
+
+      <section id="janela" class="card">
+        <h2>Live com a janela de Libras embutida</h2>
+        <p>
+          Em vez do overlay, o servidor pode receber a live do OBS, juntar a janela de Libras ao
+          vídeo e mandar o resultado para a plataforma. A live sai alguns segundos atrasada, e é
+          esse atraso que põe o sinal junto com a fala.
+        </p>
+        <ol class="steps">
+          <li>
+            No Estúdio, escolha a fonte <strong>Transmissão enviada pelo OBS (RTMP)</strong>.
+          </li>
+          <li>
+            Marque <strong>Enviar a transmissão com a janela de Libras</strong> e cole em
+            <strong>Para onde enviar</strong> o servidor da plataforma seguido da chave, como
+            <code>rtmp://a.rtmp.youtube.com/live2/</code> mais a chave do YouTube. Escolha o lado,
+            a altura e o fundo da janela.
+          </li>
+          <li>
+            Clique em <strong>Iniciar tradução</strong>. O Estúdio mostra um servidor e uma
+            chave.
+          </li>
+          <li>
+            No OBS, em <strong>Configurações → Transmissão</strong>, escolha
+            <strong>Personalizado</strong>, cole o servidor e a chave do Estúdio e transmita.
+          </li>
+        </ol>
+        <p>
+          O atraso padrão é de 8 segundos e precisa cobrir o tempo que a fala leva para virar
+          sinal. A saída é H.264 com AAC, por RTMP, RTMPS ou SRT. A composição desenha o avatar e
+          codifica o vídeo de novo, então use 720p num computador doméstico e, se puder, deixe o
+          servidor numa máquina diferente da do OBS. Cada servidor faz uma composição por vez.
+        </p>
+        <p>Pela API, é a mesma sessão com o campo <code>composition</code>:</p>
+        <pre><code>{
+  "source": { "type": "rtmp" },
+  "composition": {
+    "output": "rtmp://a.rtmp.youtube.com/live2/CHAVE",
+    "delay": 8,
+    "position": "right",
+    "size": 0.5,
+    "background": "painel",
+    "caption": true,
+    "resolution": "1280x720"
+  }
+}</code></pre>
+      </section>
+
+      <section id="videos" class="card">
+        <h2>Libras nos vídeos do seu site</h2>
+        <p>
+          O <code>closed-signing.js</code> põe um botão Libras no player, como o da legenda
+          oculta. Ligado, o avatar aparece num canto do vídeo e sinaliza a legenda em português,
+          no tempo dela. Funciona com vídeo gravado e com live em HLS com legenda WebVTT, sem
+          servidor do AutoLibras. A página <a href="./assista.html">Vídeos com Libras</a> mostra
+          um exemplo.
+        </p>
+        <pre><code>&lt;div class="player"&gt;
+  &lt;video src="aula.mp4" controls crossorigin="anonymous"&gt;
+    &lt;track kind="subtitles" srclang="pt" src="aula.vtt" /&gt;
+  &lt;/video&gt;
+&lt;/div&gt;
+&lt;script type="module"&gt;
+  import { attachClosedSigning } from "https://lucas-arantes.github.io/autolibras-tradutor/closed-signing.js";
+
+  const video = document.querySelector("video");
+  const libras = attachClosedSigning(video);
+  document.querySelector(".player").after(libras.createButton());
+&lt;/script&gt;</code></pre>
+        <p>
+          Opções úteis: <code>position</code> (<code>"right"</code> ou <code>"left"</code>),
+          <code>size</code> (altura do avatar como fração da altura do vídeo, padrão 0,5),
+          <code>signs</code> (outro pacote de sinais) e <code>feedbackUrl</code>, que liga os
+          botões "Entendi" e "Não entendi". Com hls.js, use o hls.js mesmo no Chrome: o HLS
+          nativo dele ignora a faixa de legendas. A
+          <a href="https://github.com/lucas-arantes/autolibras-tradutor/blob/main/packages/closed-signing/README.md"
+            >documentação do plugin</a
+          >
+          tem todas as opções e os eventos.
+        </p>
+      </section>
+
+      <section id="api" class="card">
+        <h2>API para outros sistemas</h2>
+        <p>
+          Cada transmissão é uma sessão no servidor. Ela tem uma entrada (áudio, endereço, RTMP
+          ou texto) e quantos overlays quiser. Com <code>AUTOLIBRAS_TOKEN</code> definido, criar
+          sessões e enviar áudio ou texto pedem o cabeçalho
+          <code>Authorization: Bearer &lt;senha&gt;</code>.
+        </p>
+        <p>Para mandar texto pronto, como uma legenda ou uma estenotipia:</p>
+        <pre><code>curl -X POST http://localhost:8000/v1/sessions \
+  -H "Authorization: Bearer SENHA" -H "Content-Type: application/json" \
+  -d '{"source": {"type": "text"}}'
+
+curl -X POST http://localhost:8000/v1/sessions/ID/text \
+  -H "Authorization: Bearer SENHA" -H "Content-Type: application/json" \
+  -d '{"text": "Boa noite a todos.", "final": true}'</code></pre>
+        <p>
+          A primeira chamada devolve o <code>id</code> da sessão, que vai no overlay
+          (<code>broadcast.html?session=ID</code>). Com <code>"final": false</code>, o texto só
+          atualiza a legenda; o avatar sinaliza os finais.
+        </p>
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Rota</th>
+                <th scope="col">O que faz</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>POST /v1/sessions</code></td>
+                <td>
+                  Cria uma sessão. Fontes: <code>audio</code>, <code>text</code>,
+                  <code>rtmp</code> e <code>url</code> (com <code>url</code>,
+                  <code>realtime</code> e <code>captions</code>).
+                </td>
+              </tr>
+              <tr>
+                <td><code>GET /v1/sessions/{id}</code></td>
+                <td>Estado da sessão e latência das últimas frases, com o atraso sugerido.</td>
+              </tr>
+              <tr>
+                <td><code>POST /v1/sessions/{id}/text</code></td>
+                <td>Envia uma frase de texto.</td>
+              </tr>
+              <tr>
+                <td><code>WS /v1/sessions/{id}/ingest</code></td>
+                <td>Entrada de áudio PCM de 16 bits, mono, 16 kHz, ou de mensagens de texto.</td>
+              </tr>
+              <tr>
+                <td><code>WS /v1/sessions/{id}/events</code></td>
+                <td>
+                  Saída: frases parciais e finais, com o horário em que a fala começou e
+                  terminou.
+                </td>
+              </tr>
+              <tr>
+                <td><code>DELETE /v1/sessions/{id}</code></td>
+                <td>Encerra a sessão.</td>
+              </tr>
+              <tr>
+                <td><code>WS /v1/stream</code></td>
+                <td>Transcrição avulsa, sem sessão, como o app usa no modo Servidor Whisper.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Os formatos das mensagens estão no
+          <a href="https://github.com/lucas-arantes/autolibras-tradutor/blob/main/services/stt-server/README.md#protocolo"
+            >README do servidor</a
+          >.
+        </p>
+      </section>
+
+      <section id="extensao" class="card">
+        <h2>Extensão do Chrome</h2>
+        <p>
+          A extensão traduz o áudio de uma aba, como um vídeo ou uma reunião, e mostra a legenda
+          e o avatar sobre a página. Ela precisa do <a href="#servidor">servidor</a> rodando,
+          porque o reconhecimento de fala do navegador só aceita o microfone.
+        </p>
+        <p>
+          Ela ainda não está na Chrome Web Store. Monte com
+          <code>npm run build -w @autolibras/extension</code>, abra
+          <code>chrome://extensions</code>, ative o modo do desenvolvedor e carregue a pasta
+          <code>apps/extension/dist</code> com <strong>Carregar sem compactação</strong>. Depois,
+          na aba que quer traduzir, clique no ícone do AutoLibras e em
+          <strong>Traduzir esta aba</strong>.
+        </p>
+      </section>
+
+      <section id="limites" class="card">
+        <h2>Privacidade e limites</h2>
+        <ul>
+          <li>
+            Com o servidor e as regras locais, nada sai do seu computador além do download dos
+            sinais e da lista de palavras do VLibras. Com a Web Speech API do Chrome, o áudio vai
+            para o Google; com o tradutor do VLibras, o texto vai para os servidores dele.
+          </li>
+          <li>
+            Palavras sem sinal no pacote são soletradas. O pacote tem cerca de 23 mil sinais,
+            convertidos do dicionário aberto do VLibras (GPL-3.0).
+          </li>
+          <li>
+            Na live, use o avatar próprio. Os termos de uso do VLibras não autorizam tradução
+            automática em produções audiovisuais.
+          </li>
+          <li>
+            A tradução automática complementa, mas não substitui intérpretes de Libras. Na TV, a
+            lei exige a janela com intérprete (Lei 13.146/2015, art. 67).
+          </li>
+        </ul>
+        <p>
+          Dúvidas e problemas:
+          <a href="https://github.com/lucas-arantes/autolibras-tradutor/issues">issues no GitHub</a>.
+        </p>
+      </section>
+    </main>
+    <script type="module" src="/src/como-usar.ts"></script>
+  </body>
+</html>

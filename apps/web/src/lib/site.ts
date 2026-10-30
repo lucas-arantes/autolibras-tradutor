@@ -1,13 +1,14 @@
 /** Navegação e rodapé comuns às páginas do site. Os endereços são relativos, para
  * funcionar na raiz e no subcaminho do GitHub Pages. */
 
-export type SitePage = "tradutor" | "transmissoes" | "videos";
+export type SitePage = "tradutor" | "transmissoes" | "videos" | "como-usar";
 
 export const SITE_LINKS: ReadonlyArray<{ page: SitePage | "codigo"; href: string; label: string }> =
   [
     { page: "tradutor", href: "./", label: "Tradutor" },
     { page: "transmissoes", href: "./studio.html", label: "Transmissões" },
     { page: "videos", href: "./assista.html", label: "Vídeos com Libras" },
+    { page: "como-usar", href: "./como-usar.html", label: "Como usar" },
     {
       page: "codigo",
       href: "https://github.com/lucas-arantes/autolibras-tradutor",

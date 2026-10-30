@@ -1,0 +1,92 @@
+.guide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1rem 16px 3rem;
+}
+.guide section {
+  scroll-margin-top: 1rem;
+}
+.guide h2 {
+  font-size: 1.15rem;
+}
+.guide h3 {
+  margin: 1.4rem 0 0;
+  font-size: 1rem;
+  color: var(--text-strong);
+}
+.guide p,
+.guide ul,
+.guide ol {
+  margin: 0.75rem 0 0;
+}
+.guide li + li {
+  margin-top: 0.35rem;
+}
+.guide li > ul {
+  margin-top: 0.35rem;
+}
+.guide a {
+  color: var(--accent);
+}
+.guide code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--surface-2);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+  overflow-wrap: anywhere;
+}
+.guide pre {
+  margin: 0.75rem 0 0;
+  padding: 0.85rem 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  line-height: 1.45;
+}
+.guide pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85rem;
+  overflow-wrap: normal;
+}
+.toc ol {
+  columns: 2 16rem;
+  column-gap: 2rem;
+  padding-left: 1.4rem;
+}
+.toc li + li {
+  margin-top: 0.2rem;
+}
+.steps > li::marker {
+  color: var(--accent);
+  font-weight: 700;
+}
+.table {
+  margin-top: 0.75rem;
+  overflow-x: auto;
+}
+.table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.94rem;
+}
+.table th,
+.table td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.table th {
+  color: var(--text-strong);
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.table td:first-child {
+  min-width: 9rem;
+}

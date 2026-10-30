@@ -25,7 +25,8 @@ export default defineConfig({
       // `studio.html` e `broadcast.html` são o Estúdio e o overlay para o OBS;
       // `avaliacao.html` é o teste de compreensão com pessoas surdas;
       // `assista.html` é a demonstração do "closed signing" num player de vídeo;
-      // `feedback.html` é o formulário em que o público avalia a tradução.
+      // `feedback.html` é o formulário em que o público avalia a tradução;
+      // `como-usar.html` é o guia técnico.
       input: {
         main: "index.html",
         player: "player.html",
@@ -34,6 +35,7 @@ export default defineConfig({
         avaliacao: "avaliacao.html",
         assista: "assista.html",
         feedback: "feedback.html",
+        "como-usar": "como-usar.html",
         // Biblioteca para outros sites, num endereço fixo: `closed-signing.js`.
         "closed-signing": "src/closed-signing-bundle.ts",
       },

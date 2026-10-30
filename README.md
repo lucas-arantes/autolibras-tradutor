@@ -9,7 +9,7 @@
 
 O AutoLibras Tradutor ouve português falado e mostra a tradução em Libras (Língua Brasileira de Sinais) com um avatar 3D, enquanto a pessoa fala. A fala vira texto, o texto vira glosa de Libras e o avatar sinaliza a glosa.
 
-O projeto está no começo. Por enquanto existem a versão web, publicada em https://lucas-arantes.github.io/autolibras-tradutor/, uma extensão do Chrome que traduz o áudio de outras abas (YouTube, Meet), um servidor de transcrição opcional, um overlay para pôr o avatar em transmissões ao vivo pelo OBS e um botão Libras para players de vídeo. Para falar em vez de digitar, use Chrome, Edge ou Safari, ou rode o servidor.
+O projeto está no começo. Por enquanto existem a versão web, publicada em https://lucas-arantes.github.io/autolibras-tradutor/, uma extensão do Chrome que traduz o áudio de outras abas (YouTube, Meet), um servidor de transcrição opcional, um overlay para pôr o avatar em transmissões ao vivo pelo OBS e um botão Libras para players de vídeo. Para falar em vez de digitar, use Chrome, Edge ou Safari, ou rode o servidor. A página [Como usar](https://lucas-arantes.github.io/autolibras-tradutor/como-usar.html) do site junta o guia técnico de tudo isso.
 
 ![O tradutor no navegador: a frase digitada aparece no histórico com a glosa, e o avatar a sinaliza ao lado.](docs/imagens/captura-app.png)
 
@@ -92,8 +92,8 @@ packages/
 apps/
   web/           PWA em Svelte 5 + Vite. Outras páginas: player.html (o avatar sozinho, usado pela extensão),
                  studio.html (Estúdio de transmissão), broadcast.html (overlay do OBS), assista.html
-                 (botão Libras num player), feedback.html (retorno do público) e avaliacao.html
-                 (teste de compreensão)
+                 (botão Libras num player), como-usar.html (guia técnico), feedback.html (retorno
+                 do público) e avaliacao.html (teste de compreensão)
   extension/     Extensão do Chrome (Manifest V3) que traduz o áudio de uma aba
 services/
   stt-server/    Servidor de transcrição em Python (Whisper, VAD, WebSocket, sessões de transmissão)

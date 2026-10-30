@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AutoLibras · teste de compreensão</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6fa;
+        --surface: #ffffff;
+        --surface-2: #eef2f7;
+        --border: #d6dde8;
+        --text: #2a3342;
+        --muted: #5b6678;
+        --accent: #0b5cad;
+        --on-accent: #ffffff;
+        --danger: #c0352b;
+        font-family: system-ui, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f141c;
+          --surface: #171e29;
+          --surface-2: #1f2834;
+          --border: #2d3846;
+          --text: #cfd7e3;
+          --muted: #93a0b3;
+          --accent: #4b9be8;
+          --on-accent: #08121f;
+          --danger: #ff8a80;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.45;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+      h1 {
+        font-size: 1.3rem;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 1.05rem;
+        margin: 0 0 12px;
+      }
+      p {
+        margin: 0 0 12px;
+      }
+      .muted,
+      small {
+        color: var(--muted);
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 800px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      label.field {
+        display: grid;
+        gap: 4px;
+        margin-bottom: 12px;
+      }
+      label.field > span,
+      legend {
+        font-weight: 600;
+      }
+      fieldset {
+        border: 0;
+        padding: 0;
+        margin: 0 0 12px;
+      }
+      input[type="text"],
+      input[type="url"],
+      input[type="number"],
+      textarea {
+        font: inherit;
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--surface-2);
+        color: var(--text);
+      }
+      textarea {
+        min-height: 5em;
+        resize: vertical;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .scale {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .scale label {
+        display: grid;
+        place-items: center;
+        min-width: 3.2em;
+        padding: 6px 8px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        cursor: pointer;
+        text-align: center;
+        font-size: 0.9rem;
+      }
+      .scale label:has(input:checked) {
+        border-color: var(--accent);
+        outline: 2px solid var(--accent);
+      }
+      .scale input {
+        position: absolute;
+        opacity: 0;
+      }
+      button {
+        font: inherit;
+        padding: 8px 16px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--surface-2);
+        color: var(--text);
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--on-accent);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #stage {
+        position: relative;
+        aspect-ratio: 4 / 3;
+        border-radius: 12px;
+        background: var(--surface-2);
+        overflow: hidden;
+        display: grid;
+        place-items: center;
+      }
+      #stage canvas,
+      #stage video {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      #stage-note {
+        padding: 16px;
+        text-align: center;
+        color: var(--muted);
+      }
+      .error {
+        color: var(--danger);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 6px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      .grid[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Teste de compreensão do avatar</h1>
+      <p class="muted">
+        Ferramenta para quem aplica o teste. Nada sai deste navegador: as respostas ficam guardadas
+        aqui até você baixar o CSV ou apagar. O protocolo está em
+        <code>docs/avaliacao/protocolo.md</code>.
+      </p>
+
+      <section id="setup" class="card">
+        <h2>Nova sessão</h2>
+        <label class="field">
+          <span>Código do participante</span>
+          <input id="participant" type="text" placeholder="P01" autocomplete="off" required />
+          <small>Use um código, nunca o nome. Ele também sorteia a ordem das frases.</small>
+        </label>
+        <label class="field">
+          <span>Número do participante</span>
+          <input id="participant-number" type="number" min="1" step="1" value="1" />
+          <small>Define o rodízio das condições (1, 2, 3...). Cada participante recebe o seguinte.</small>
+        </label>
+        <fieldset>
+          <legend>Condições</legend>
+          <div class="row">
+            <label><input type="checkbox" name="condition" value="propio" checked /> Avatar próprio</label>
+            <label><input type="checkbox" name="condition" value="vlibras" checked /> Avatar do VLibras</label>
+            <label><input type="checkbox" name="condition" value="video" /> Vídeo de intérprete</label>
+          </div>
+          <small>O vídeo só entra nas frases que têm vídeo no conjunto de frases.</small>
+        </fieldset>
+        <label class="field">
+          <span>Pacote de sinais do avatar próprio</span>
+          <input id="signs" type="url" placeholder="https://…/BR/" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>Velocidade</span>
+          <input id="speed" type="number" min="0.5" max="1.5" step="0.05" value="1" />
+        </label>
+        <label class="field">
+          <span>Conjunto de frases (opcional)</span>
+          <input id="sentence-file" type="file" accept="application/json,.json" />
+          <small id="sentence-info"></small>
+        </label>
+        <div class="row">
+          <button id="practice" type="button">Treino</button>
+          <button id="start" type="button" class="primary">Começar</button>
+        </div>
+        <p id="setup-error" class="error" role="alert"></p>
+      </section>
+
+      <section id="trial" class="grid" hidden>
+        <div class="card">
+          <div id="stage"><p id="stage-note"></p></div>
+          <div class="row" style="margin-top: 12px">
+            <button id="show" type="button" class="primary">Mostrar</button>
+            <button id="replay" type="button" disabled>Repetir</button>
+            <span id="progress" class="muted"></span>
+          </div>
+        </div>
+        <form id="answer-form" class="card">
+          <label class="field">
+            <span>O que foi sinalizado?</span>
+            <textarea id="answer" placeholder="Escreva com as suas palavras" required></textarea>
+          </label>
+          <fieldset>
+            <legend>A sinalização pareceu natural?</legend>
+            <div class="scale" id="naturalness"></div>
+          </fieldset>
+          <fieldset>
+            <legend>Quanta certeza você tem da resposta?</legend>
+            <div class="scale" id="confidence"></div>
+          </fieldset>
+          <label class="field">
+            <span>Comentário (opcional)</span>
+            <textarea id="comment"></textarea>
+          </label>
+          <div class="row">
+            <button id="next" type="submit" class="primary" disabled>Próxima</button>
+            <button id="skip" type="button">Pular</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="done" class="card" hidden>
+        <h2>Sessão concluída</h2>
+        <p id="summary"></p>
+        <div class="row">
+          <button id="download-session" type="button" class="primary">Baixar CSV desta sessão</button>
+          <button id="new-session" type="button">Nova sessão</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Dados guardados neste navegador</h2>
+        <p id="stored" class="muted"></p>
+        <div class="row">
+          <button id="download-all" type="button">Baixar CSV de todas as sessões</button>
+          <button id="clear" type="button">Apagar tudo</button>
+        </div>
+        <details style="margin-top: 12px">
+          <summary>Respostas</summary>
+          <table>
+            <thead>
+              <tr>
+                <th>Participante</th>
+                <th>Frase</th>
+                <th>Condição</th>
+                <th>Resposta</th>
+                <th>Palavras-chave</th>
+                <th>Naturalidade</th>
+              </tr>
+            </thead>
+            <tbody id="results"></tbody>
+          </table>
+        </details>
+      </section>
+    </main>
+    <script type="module" src="/src/avaliacao.ts"></script>
+  </body>
+</html>

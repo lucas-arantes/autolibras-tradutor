@@ -9,12 +9,14 @@ export default defineConfig({
     assetsInlineLimit: (file) => (file.endsWith("capture-worklet.js") ? false : undefined),
     rollupOptions: {
       // `player.html` é o avatar sozinho, embutido pela extensão do navegador;
-      // `studio.html` e `broadcast.html` são o Estúdio e o overlay para o OBS.
+      // `studio.html` e `broadcast.html` são o Estúdio e o overlay para o OBS;
+      // `avaliacao.html` é o teste de compreensão com pessoas surdas.
       input: {
         main: "index.html",
         player: "player.html",
         studio: "studio.html",
         broadcast: "broadcast.html",
+        avaliacao: "avaliacao.html",
       },
     },
   },

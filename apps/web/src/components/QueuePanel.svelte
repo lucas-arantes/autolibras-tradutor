@@ -106,7 +106,8 @@ const level = $derived(fill > 75 ? "high" : fill > 40 ? "medium" : "low");
   .stage :global(canvas) {
     display: block;
     width: 100%;
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 1 / 1;
+    max-height: 60vh;
     border-radius: var(--radius-sm);
     background: var(--surface-2);
   }

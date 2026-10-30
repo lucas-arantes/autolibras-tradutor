@@ -9,8 +9,12 @@
  */
 import { attachClosedSigning } from "./closed-signing-bundle";
 import { SIGN_PACK_URL } from "./lib/avatar";
+import { renderSiteFooter, renderSiteNav } from "./lib/site";
 import "./app.css";
 import "./assista.css";
+
+document.querySelector(".brand")?.after(renderSiteNav("videos"));
+document.querySelector("main")?.after(renderSiteFooter());
 
 const params = new URLSearchParams(location.search);
 const video = document.getElementById("video") as HTMLVideoElement;
@@ -39,7 +43,11 @@ form.addEventListener("submit", (event) => {
 
 async function load(): Promise<void> {
   if (!videoUrl) {
-    status.textContent = "Informe o endereço de um vídeo com legenda em português.";
+    // Sem vídeo, o player vazio só confunde: fica a explicação e o formulário.
+    document.querySelector<HTMLElement>(".player")?.setAttribute("hidden", "");
+    document.querySelector<HTMLElement>(".bar")?.setAttribute("hidden", "");
+    document.getElementById("intro")?.removeAttribute("hidden");
+    field("video").focus();
     return;
   }
   if (captionsUrl) {

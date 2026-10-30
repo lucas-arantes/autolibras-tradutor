@@ -1,6 +1,8 @@
 <script lang="ts">
 import { captureStream, RemoteWhisperRecognizer } from "@autolibras/stt-web";
 import { onDestroy } from "svelte";
+import SiteFooter from "./components/SiteFooter.svelte";
+import SiteNav from "./components/SiteNav.svelte";
 import {
   type FeedbackList,
   feedbackPageUrl,
@@ -30,6 +32,7 @@ let error = $state<string | null>(null);
 let transcript = $state("");
 let devices = $state<MediaDeviceInfo[]>([]);
 let copied = $state(false);
+let checked = $state(false);
 let typed = $state("");
 let feedback = $state<FeedbackList | null>(null);
 let feedbackCopied = $state(false);
@@ -54,14 +57,16 @@ const ownAvatar = $derived(settings.avatar === "propio");
 
 $effect(() => saveStudioSettings($state.snapshot(settings)));
 
-async function checkServer(): Promise<void> {
+/** `quiet`: na abertura da página, a falta de servidor vira uma explicação, não um erro. */
+async function checkServer(quiet = false): Promise<void> {
   error = null;
   try {
     health = await api.health();
   } catch (e) {
     health = null;
-    error = e instanceof Error ? e.message : String(e);
+    if (!quiet) error = e instanceof Error ? e.message : String(e);
   }
+  checked = true;
 }
 
 async function listDevices(): Promise<void> {
@@ -196,7 +201,7 @@ const stateLabel: Record<SessionInfo["state"], string> = {
   error: "erro",
 };
 
-checkServer();
+checkServer(true);
 onDestroy(() => {
   clearInterval(poll);
   recognizer?.stop();
@@ -212,6 +217,7 @@ onDestroy(() => {
         <p>Libras automática na sua transmissão, pelo OBS</p>
       </div>
     </div>
+    <SiteNav current="transmissoes" />
     <div class="pills" aria-label="Estado">
       <span class="pill" data-state={health ? "pronto" : "erro"}>
         Servidor: {health ? `pronto (${health.model})` : "sem conexão"}
@@ -241,7 +247,7 @@ onDestroy(() => {
         <span>Endereço</span>
         <div class="row">
           <input type="url" bind:value={settings.server} spellcheck="false" disabled={running} />
-          <button type="button" class="secondary" onclick={checkServer}>Testar</button>
+          <button type="button" class="secondary" onclick={() => checkServer()}>Testar</button>
         </div>
       </label>
       {#if health?.tokenRequired || settings.token}
@@ -251,6 +257,15 @@ onDestroy(() => {
         </label>
       {/if}
     </div>
+    {#if checked && !health}
+      <p class="muted server-missing">
+        Nenhum servidor do AutoLibras respondeu em {settings.server}. Para transmitir, suba o servidor
+        no seu computador com o Docker, seguindo o
+        <a href="https://github.com/lucas-arantes/autolibras-tradutor/blob/main/docs/transmissoes-obs.md">
+          guia do OBS</a
+        >, e clique em Testar.
+      </p>
+    {/if}
   </section>
 
   <section class="card">
@@ -407,18 +422,22 @@ onDestroy(() => {
                 : 0;
             }}
           />
-          Modo sincronizado: o vídeo da transmissão está atrasado em
-          <input
-            type="number"
-            min="1"
-            max="60"
-            class="seconds"
-            bind:value={settings.syncDelay}
-            disabled={settings.syncDelay <= 0}
-            aria-label="Atraso do vídeo, em segundos"
-          />
-          segundos
+          Modo sincronizado
         </label>
+        {#if settings.syncDelay > 0}
+          <label class="check indent">
+            O vídeo da transmissão está atrasado em
+            <input
+              type="number"
+              min="1"
+              max="60"
+              class="seconds"
+              bind:value={settings.syncDelay}
+              aria-label="Atraso do vídeo, em segundos"
+            />
+            segundos
+          </label>
+        {/if}
         {#if session?.latency}
           <small class="muted">
             Nesta sessão, metade das frases ficou pronta em {session.latency.p50} s e 95% em até
@@ -494,10 +513,12 @@ onDestroy(() => {
     </p>
   </section>
 </main>
+<SiteFooter />
 
 <style>
   .studio {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
     max-width: 760px;
     margin: 0 auto;
@@ -582,6 +603,9 @@ onDestroy(() => {
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
+  }
+  .server-missing {
+    margin-top: 0.75rem;
   }
   .text-form {
     margin-top: 1rem;

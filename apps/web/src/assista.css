@@ -5,6 +5,19 @@
   margin: 0 auto;
   padding: 1rem 16px 3rem;
 }
+.intro h2,
+#form h2 {
+  font-size: 1.05rem;
+}
+.intro p {
+  margin: 0.5rem 0 0;
+  color: var(--text-muted);
+}
+.intro[hidden],
+.player[hidden],
+.bar[hidden] {
+  display: none;
+}
 .player {
   background: #000;
   border-radius: var(--radius-sm);

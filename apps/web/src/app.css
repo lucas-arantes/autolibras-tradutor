@@ -20,7 +20,8 @@
   --shadow: 0 1px 2px rgb(15 23 36 / 6%), 0 4px 16px rgb(15 23 36 / 5%);
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  /* Espaço reservado para a janela do VLibras, fixa no lado direito da tela. */
+  /* Espaço reservado para a janela do VLibras, fixa no lado direito da tela.
+     Só existe com o avatar do VLibras (ver o seletor abaixo). */
   --avatar-space: 0px;
 }
 
@@ -47,7 +48,7 @@
 }
 
 @media (min-width: 1100px) {
-  :root {
+  :root[data-avatar="vlibras"] {
     --avatar-space: 320px;
   }
 }
@@ -83,6 +84,14 @@ button,
 input,
 select {
   font: inherit;
+}
+
+a {
+  color: var(--accent);
+}
+
+a:hover {
+  color: var(--accent-strong);
 }
 
 button {
@@ -175,8 +184,44 @@ button:disabled {
 
 @media (min-width: 860px) {
   .layout {
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 1fr) 380px;
     align-items: start;
+  }
+
+  /* O avatar fica à vista enquanto a página rola. */
+  .layout > .side {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+/* No celular, o avatar vem logo depois do microfone e da legenda: as duas
+   colunas se desfazem e cada cartão ganha sua ordem. */
+@media (max-width: 859px) {
+  .layout > .live,
+  .layout > .side {
+    display: contents;
+  }
+  .layout .mic-card {
+    order: 1;
+  }
+  .layout .alert {
+    order: 2;
+  }
+  .layout .queue {
+    order: 3;
+  }
+  .layout .type-form {
+    order: 4;
+  }
+  .layout .history {
+    order: 5;
+  }
+  .layout .settings {
+    order: 6;
+  }
+  .layout .notice {
+    order: 7;
   }
 }
 
@@ -281,6 +326,7 @@ button:disabled {
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -294,6 +340,13 @@ select {
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
+}
+
+/* Campo e botão lado a lado; em tela estreita, o botão desce para a linha de baixo. */
+.row > input,
+.row > select {
+  flex: 1 1 12rem;
+  min-width: 0;
 }
 
 button.secondary {
@@ -361,4 +414,40 @@ button.link {
 
 .notice p:last-child {
   margin-bottom: 0;
+}
+
+/* Navegação e rodapé comuns ----------------------------------------------- */
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.site-nav a {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.site-nav a:hover {
+  color: var(--text-strong);
+  background: var(--surface-2);
+}
+
+.site-nav a[aria-current="page"] {
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.site-footer {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 16px 2.5rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
 }

@@ -3,6 +3,8 @@ import { onMount } from "svelte";
 import History from "./components/History.svelte";
 import QueuePanel from "./components/QueuePanel.svelte";
 import SettingsPanel from "./components/SettingsPanel.svelte";
+import SiteFooter from "./components/SiteFooter.svelte";
+import SiteNav from "./components/SiteNav.svelte";
 import { TranslatorController } from "./lib/controller.svelte";
 
 const app = new TranslatorController();
@@ -10,6 +12,11 @@ let typed = $state("");
 
 onMount(() => {
   void app.loadAvatar();
+});
+
+// O layout só reserva o canto da janela do VLibras quando ela está em uso.
+$effect(() => {
+  document.documentElement.dataset.avatar = app.avatarKind;
 });
 
 const micLabel = $derived(
@@ -32,6 +39,7 @@ function onSubmit(event: SubmitEvent) {
       <p>Português falado → Libras</p>
     </div>
   </div>
+  <SiteNav current="tradutor" />
   <div class="pills" aria-label="Estado">
     <span class="pill" data-state={app.micState}>Microfone: {micLabel}</span>
     <span class="pill" data-state={app.avatarStatus}>Avatar: {app.avatarStatus}</span>
@@ -102,21 +110,6 @@ function onSubmit(event: SubmitEvent) {
     {/if}
 
     <History entries={app.entries} onClear={() => app.clearHistory()} />
-  </section>
-
-  <aside class="side" aria-label="Avatar e configurações">
-    <QueuePanel
-      lagSeconds={app.lagSeconds}
-      maxLagSeconds={app.settings.maxLagSeconds}
-      speed={app.speed}
-      pending={app.pending}
-      dropped={app.dropped}
-      avatarStatus={app.avatarStatus}
-      avatarKind={app.avatarKind}
-      avatarCanvas={app.avatarCanvas}
-      onClear={() => app.clearQueue()}
-      onRetry={() => app.loadAvatar()}
-    />
     <SettingsPanel settings={app.settings} onChange={(changes) => app.updateSettings(changes)} />
     <section class="card notice">
       <h2>Avisos</h2>
@@ -129,5 +122,21 @@ function onSubmit(event: SubmitEvent) {
         texto transcrito é enviado aos servidores do VLibras (governo federal).
       </p>
     </section>
+  </section>
+
+  <aside class="side" aria-label="Avatar">
+    <QueuePanel
+      lagSeconds={app.lagSeconds}
+      maxLagSeconds={app.settings.maxLagSeconds}
+      speed={app.speed}
+      pending={app.pending}
+      dropped={app.dropped}
+      avatarStatus={app.avatarStatus}
+      avatarKind={app.avatarKind}
+      avatarCanvas={app.avatarCanvas}
+      onClear={() => app.clearQueue()}
+      onRetry={() => app.loadAvatar()}
+    />
   </aside>
 </main>
+<SiteFooter />

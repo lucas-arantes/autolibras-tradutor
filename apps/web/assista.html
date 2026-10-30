@@ -21,6 +21,13 @@
       </div>
     </header>
     <main class="watch">
+      <section id="intro" class="card intro" hidden>
+        <h2>Libras sob demanda em qualquer vídeo com legenda</h2>
+        <p>
+          Abra um vídeo que tenha legenda em português. O botão <strong>Libras</strong> liga um
+          avatar no canto do vídeo, que sinaliza cada frase da legenda no tempo dela.
+        </p>
+      </section>
       <div class="player">
         <!-- biome-ignore lint/a11y/useMediaCaption: a faixa de legenda é posta pelo script, conforme o vídeo escolhido -->
         <video id="video" controls playsinline crossorigin="anonymous"></video>
@@ -30,6 +37,7 @@
         <span id="status" class="muted" aria-live="polite"></span>
       </div>
       <form id="form" class="card">
+        <h2>Abrir um vídeo</h2>
         <label class="field">
           <span>Vídeo (arquivo ou HLS .m3u8)</span>
           <input name="video" type="url" required spellcheck="false" />

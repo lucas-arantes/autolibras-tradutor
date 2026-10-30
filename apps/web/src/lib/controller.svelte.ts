@@ -141,7 +141,12 @@ export class TranslatorController {
       const signsUrl = kind === "propio" ? signsUrlOf(this.settings) : "";
       // Um pacote novo precisa de um avatar novo (o renderer guarda o manifest).
       if (this.#avatar?.kind !== kind || this.#avatarSigns !== signsUrl) {
-        const handle = await createAvatar(kind, { vlibrasAvatar: this.settings.avatar, signsUrl });
+        // Fundo transparente: o cartão do avatar dá a cor, que acompanha o tema claro ou escuro.
+        const handle = await createAvatar(kind, {
+          vlibrasAvatar: this.settings.avatar,
+          signsUrl,
+          background: null,
+        });
         if (request !== this.#avatarRequest) {
           handle.dispose();
           return;
@@ -160,7 +165,7 @@ export class TranslatorController {
     } catch (error) {
       if (request !== this.#avatarRequest) return;
       this.avatarStatus = "erro";
-      this.lastError = error instanceof Error ? error.message : String(error);
+      this.lastError = avatarErrorMessage(error);
     }
   }
 
@@ -276,4 +281,16 @@ export class TranslatorController {
       this.lastError = `${prefix}: ${error.message}`;
     });
   }
+}
+
+/** Mensagem de erro do avatar em linguagem simples (a do three.js não diz o que fazer). */
+export function avatarErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/webgl/i.test(message)) {
+    return (
+      "Este navegador não conseguiu iniciar o desenho em 3D (WebGL), que o avatar usa. " +
+      "Ative a aceleração de hardware nas configurações do navegador ou tente outro navegador."
+    );
+  }
+  return `Não foi possível carregar o avatar: ${message}`;
 }

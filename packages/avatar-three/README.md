@@ -78,7 +78,7 @@ const pipeline = new Pipeline({ translator, renderer: avatar.renderer });
 
 ## Pacote de sinais (GPL-3.0, fora deste repositório)
 
-Os clipes vêm do dicionário aberto do VLibras ([vlibras-dictionary-sources](https://gitlab.lavid.ufpb.br/vlibras-public/vlibras-dictionary/vlibras-dictionary-sources), GPL-3.0). Por isso ficam fora deste repositório MIT: são gerados localmente, ignorados pelo git e carregados por URL em tempo de execução. O pacote completo é montado e publicado num repositório à parte, `autolibras-sinais`, que chama os scripts daqui. O repositório de origem traz o texto da GPLv3 sem a cláusula "ou posterior", então os clipes saem marcados como GPL-3.0-only.
+Os clipes vêm do dicionário aberto do VLibras ([vlibras-dictionary-sources](https://gitlab.lavid.ufpb.br/vlibras-public/vlibras-dictionary/vlibras-dictionary-sources), GPL-3.0). Por isso ficam fora deste repositório MIT: são gerados localmente, ignorados pelo git e carregados por URL em tempo de execução. O pacote completo é montado e publicado num repositório à parte, [autolibras-sinais](https://github.com/lucas-arantes/autolibras-sinais), que chama os scripts daqui. O pacote da região BR fica em https://lucas-arantes.github.io/autolibras-sinais/BR/. O repositório de origem traz o texto da GPLv3 sem a cláusula "ou posterior", então os clipes saem marcados como GPL-3.0-only.
 
 Para gerar um pacote, você precisa do Blender 4.5 ou mais recente e do Python 3:
 
@@ -86,7 +86,7 @@ Para gerar um pacote, você precisa do Blender 4.5 ou mais recente e do Python 3
 python3 packages/avatar-three/tools/clips/build_pack.py --out packages/avatar-three/demo/public/signs OI BOM_DIA EU VOCÊ NOME CASA OBRIGADO GOSTAR NÃO QUAL TUDO_BEM ÁGUA A B C D E F G H I J K L M N O P Q R S T U V W X Y Z Ç
 ```
 
-`--all` converte o dicionário inteiro (~23 mil sinais). Os `.blend` baixados (~60 GB) ficam em `~/.cache/autolibras/vlibras-sources`, e o script retoma de onde parou. Ele baixa e converte lote a lote. Um sinal que falha, seja no download ou no Blender, vai para `failures.json` sem parar os outros e é tentado de novo na próxima execução. `--ref` fixa o commit do dicionário, que fica registrado no `manifest.json` (`sourceCommit`). Alguns arquivos do repositório de origem têm o nome em NFD (o acento separado da letra), e o download tenta as duas formas.
+`--all` converte o dicionário inteiro (~23 mil sinais). Os `.blend` baixados (~40 GB) ficam em `~/.cache/autolibras/vlibras-sources`, e o script retoma de onde parou. Ele baixa e converte lote a lote. Um sinal que falha, seja no download ou no Blender, vai para `failures.json` sem parar os outros e é tentado de novo na próxima execução. `--ref` fixa o commit do dicionário, que fica registrado no `manifest.json` (`sourceCommit`). Alguns arquivos do repositório de origem têm o nome em NFD (o acento separado da letra), e o download tenta as duas formas.
 
 A conversão (`tools/clips/vlibras_to_vrm.py`) roda no Blender headless:
 
@@ -95,7 +95,7 @@ A conversão (`tools/clips/vlibras_to_vrm.py`) roda no Blender headless:
 3. Detecta o trecho principal do sinal (`strokeStart` e `strokeEnd`) pela distância e pela velocidade dos punhos. Num sinal parado, como a letra E, o trecho principal é uma pausa curta no meio do clipe.
 4. Mede os contatos: para cada mão perto do rosto, do peito ou da outra mão, grava o deslocamento do ponto mais próximo da mão (punho, palma ou ponta de dedo) no referencial dessa âncora, com um peso que cai com a distância.
 5. Lê, em cada quadro, as shape keys do rosto que os drivers do rig calcularam e as junta em canais de expressão (veja [Expressões não manuais](#expressões-não-manuais)). Cada canal é medido a partir do primeiro quadro, que é o rosto neutro do sinal, e só é gravado se passar de 0,08.
-6. Grava um `.glb` por sinal com as rotações, os contatos e as expressões. Contatos e expressões vão em nós fictícios: `contact_<lado>_<âncora>_<ponto>`, com o deslocamento na translação e o peso na escala, e `face_<canal>`, com o peso na escala. Os quaternions ficam em int16 e os quadros-chave são reduzidos com erro máximo de 0,3° (0,02 de peso nas expressões), o que dá de 20 a 45 KB por sinal. Grava também as medidas de qualidade no `manifest.json`.
+6. Grava um `.glb` por sinal com as rotações, os contatos e as expressões. Contatos e expressões vão em nós fictícios: `contact_<lado>_<âncora>_<ponto>`, com o deslocamento na translação e o peso na escala, e `face_<canal>`, com o peso na escala. Os quaternions ficam em int16 e os quadros-chave são reduzidos com erro máximo de 0,3° (0,02 de peso nas expressões). Todos os dados ficam numa única bufferView, e trilhas com os mesmos tempos usam o mesmo accessor, porque num clipe o JSON do glTF pesa mais que os dados. Cada sinal fica com 20 a 40 KB. Grava também as medidas de qualidade no `manifest.json`.
 
 ## Demo
 

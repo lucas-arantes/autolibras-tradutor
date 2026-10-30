@@ -39,10 +39,11 @@ Abra http://localhost:5173. O avatar precisa de WebGL e leva alguns segundos par
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | Servidor de desenvolvimento do app web |
-| `npm run build` | Build de produção (`apps/web/dist`) |
+| `npm run build` | Build de produção do app e da extensão (`apps/web/dist` e `apps/extension/dist`) |
 | `npm test` | Testes unitários (Vitest) |
 | `npm run typecheck` | TypeScript e svelte-check |
 | `npm run lint` | Lint e formatação (Biome) |
+| `npm run dev -w @autolibras/avatar-three` | Demo do avatar próprio |
 
 ## Estrutura
 
@@ -60,7 +61,7 @@ services/
   stt-server/    Servidor de transcrição em Python (Whisper, VAD, WebSocket)
 ```
 
-Cada etapa implementa uma interface definida em `@autolibras/core`. Por isso dá para trocar o reconhecedor de fala, o tradutor ou o avatar sem mexer nas outras etapas.
+Cada etapa implementa uma interface definida em `@autolibras/core`. Por isso dá para trocar o reconhecedor de fala, o tradutor ou o avatar sem mexer nas outras etapas. O [avatar próprio](packages/avatar-three/README.md) usa essa mesma interface e vai substituir o do VLibras quando estiver pronto.
 
 ## Limitações conhecidas
 

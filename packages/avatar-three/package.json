@@ -1,0 +1,26 @@
+{
+  "name": "@autolibras/avatar-three",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Avatar próprio do AutoLibras: modelo VRM em three.js que sinaliza glosas com clipes carregados por URL",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "vite demo",
+    "build": "vite build demo",
+    "check:browser": "node demo/browser-check.mjs"
+  },
+  "dependencies": {
+    "@autolibras/core": "*",
+    "@pixiv/three-vrm": "^3.5.5",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "playwright-core": "^1.64.1",
+    "vite": "^8.3.5"
+  }
+}

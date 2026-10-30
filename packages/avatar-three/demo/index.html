@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Avatar VRM do AutoLibras</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6f9;
+        --panel: #ffffff;
+        --text: #1d2430;
+        --muted: #5b6575;
+        --accent: #1f6feb;
+        --warn: #b35900;
+        --border: #d5dbe3;
+        font-family: system-ui, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #11151b;
+          --panel: #1a2029;
+          --text: #e6ebf2;
+          --muted: #9aa5b5;
+          --accent: #5b9dff;
+          --warn: #ffab5e;
+          --border: #2c3542;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(280px, 1fr);
+        gap: 16px;
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+      @media (max-width: 760px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+      canvas {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        display: block;
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+      }
+      h1 {
+        font-size: 1.2rem;
+        margin: 0 0 8px;
+      }
+      p {
+        color: var(--muted);
+        margin: 0 0 12px;
+        line-height: 1.4;
+      }
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 4.5em;
+        font: 1rem ui-monospace, monospace;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin: 8px 0;
+      }
+      button {
+        font: inherit;
+        padding: 6px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      .chips button {
+        padding: 2px 8px;
+        font-size: 0.85rem;
+      }
+      #status {
+        font-weight: 600;
+        min-height: 1.5em;
+      }
+      #status.placeholder {
+        color: var(--warn);
+      }
+      #now {
+        font: 600 2rem ui-monospace, monospace;
+        text-align: center;
+        margin-top: 8px;
+        min-height: 1.3em;
+      }
+      #now.placeholder {
+        color: var(--warn);
+      }
+      small {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div>
+        <canvas id="avatar"></canvas>
+        <div id="now" aria-live="polite"></div>
+      </div>
+      <section>
+        <h1>Avatar VRM do AutoLibras</h1>
+        <p>
+          Digite uma glosa (formato do VLibras) e veja o avatar sinalizar. Palavras sem sinal no
+          pacote são soletradas; se faltar a letra, aparece um aviso.
+        </p>
+        <textarea id="gloss" spellcheck="false">OI [EXCLAMAÇÃO] EU NOME A N A [PONTO]</textarea>
+        <div class="row">
+          <button id="play" type="button" class="primary" disabled>Sinalizar</button>
+          <button id="stop" type="button">Parar</button>
+          <label>Velocidade <input id="speed" type="range" min="0.5" max="2" step="0.25" value="1" /></label>
+          <output id="speed-value">1×</output>
+        </div>
+        <div class="row" id="examples"></div>
+        <div id="status">Carregando…</div>
+        <p><small id="pack-info"></small></p>
+        <div class="row chips" id="signs"></div>
+      </section>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

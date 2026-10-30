@@ -52,6 +52,7 @@ packages/
   gloss-rules/   Tradutor PT→glosa por regras (verbos, plurais, números, expressões)
   stt-web/       Reconhecimento de fala: Web Speech API e cliente do servidor Whisper
   vlibras/       Adaptadores do VLibras: API de tradução, avatar do Widget, proteção contra captura de cliques
+  avatar-three/  Avatar próprio em VRM (three.js), em desenvolvimento e ainda fora do app
 apps/
   web/           PWA em Svelte 5 + Vite (inclui player.html, o avatar sozinho usado pela extensão)
   extension/     Extensão do Chrome (Manifest V3) que traduz o áudio de uma aba

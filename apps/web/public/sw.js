@@ -1,9 +1,12 @@
 // Service worker mínimo: guarda os arquivos do próprio app para abrir rápido e
 // permitir instalação. Reconhecimento de fala e VLibras dependem de rede.
 const CACHE = "autolibras-v1";
+// Caminhos relativos ao service worker, para funcionar na raiz ou num subcaminho.
+const ROOT = new URL("./", self.location).href;
+const ICON = new URL("icon.svg", self.location).href;
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(["/", "/icon.svg"])));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([ROOT, ICON])));
   self.skipWaiting();
 });
 
@@ -29,10 +32,10 @@ self.addEventListener("fetch", (event) => {
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put("/", copy));
+          caches.open(CACHE).then((cache) => cache.put(ROOT, copy));
           return response;
         })
-        .catch(() => caches.match("/")),
+        .catch(() => caches.match(ROOT)),
     );
     return;
   }

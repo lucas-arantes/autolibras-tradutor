@@ -12,6 +12,7 @@ mount(App, { target });
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    // BASE_URL é "/" localmente e "/autolibras-tradutor/" no GitHub Pages.
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
   });
 }

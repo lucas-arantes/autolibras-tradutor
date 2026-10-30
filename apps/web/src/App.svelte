@@ -26,7 +26,7 @@ function onSubmit(event: SubmitEvent) {
 <header class="topbar">
   <div class="topbar-inner">
   <div class="brand">
-    <img src="/icon.svg" alt="" width="36" height="36" />
+    <img src="{import.meta.env.BASE_URL}icon.svg" alt="" width="36" height="36" />
     <div>
       <h1>AutoLibras Tradutor</h1>
       <p>Português falado → Libras</p>

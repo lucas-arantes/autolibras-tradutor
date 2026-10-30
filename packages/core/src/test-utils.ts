@@ -31,6 +31,7 @@ export class FakeRenderer implements AvatarRenderer {
   }
 }
 
+/** Espera todas as microtarefas pendentes (contar ticks de `await` varia entre versões do V8). */
 export async function flush(): Promise<void> {
-  for (let i = 0; i < 10; i++) await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }

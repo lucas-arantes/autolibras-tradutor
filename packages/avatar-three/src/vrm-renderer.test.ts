@@ -8,8 +8,10 @@ import { type AvatarStage, type SignEvent, VrmRenderer } from "./vrm-renderer";
 
 const Y = new Vector3(0, 1, 0);
 
+// Espera todas as microtarefas pendentes. Contar ticks de `await` não é confiável:
+// o número muda entre versões do V8 (o CI usa Node 22; aqui passava com outra versão).
 async function flush(): Promise<void> {
-  for (let i = 0; i < 10; i++) await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function yaw(deg: number): Quaternion {

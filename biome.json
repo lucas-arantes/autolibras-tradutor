@@ -1,7 +1,13 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
   "files": {
-    "includes": ["**", "!**/dist", "!**/node_modules", "!**/*.md"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/*.md",
+      "!packages/avatar-three/demo/public/signs"
+    ]
   },
   "formatter": {
     "indentStyle": "space",

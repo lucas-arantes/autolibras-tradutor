@@ -50,6 +50,7 @@ packages/
   gloss-rules/   Tradutor PT→glosa por regras (verbos, plurais, números, expressões)
   stt-web/       Reconhecimento de fala via Web Speech API
   vlibras/       Adaptadores do VLibras: API de tradução, avatar do Widget, proteção contra captura de cliques
+  avatar-three/  Avatar próprio em VRM (three.js), em desenvolvimento e ainda fora do app
 apps/
   web/           PWA em Svelte 5 + Vite
 ```

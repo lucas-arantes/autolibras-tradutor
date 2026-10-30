@@ -1,0 +1,5 @@
+# Clipes convertidos do VLibras (GPL-3.0): nunca entram neste repositório MIT.
+demo/public/signs/
+# Arquivos .blend baixados e saídas temporárias
+*.blend
+__pycache__/

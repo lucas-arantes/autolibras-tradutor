@@ -68,6 +68,10 @@ Quando o Widget do VLibras está aberto, ele intercepta os cliques da página pa
 
 O avatar precisa de WebGL, e a janela do Widget fica fixa no canto direito da tela.
 
+## Contribuindo
+
+Veja [CONTRIBUTING.md](CONTRIBUTING.md). Avaliações de pessoas surdas e intérpretes sobre a qualidade da sinalização ajudam muito.
+
 ## Aviso
 
 A tradução automática ajuda na acessibilidade, mas não substitui intérpretes de Libras, principalmente em contextos educacionais, jurídicos e audiovisuais (Lei 13.146/2015, art. 28).

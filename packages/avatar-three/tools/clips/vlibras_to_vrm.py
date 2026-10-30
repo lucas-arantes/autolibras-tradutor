@@ -582,17 +582,36 @@ def write_glb(path, local_tracks, fps, meta, tol_deg, contacts=(), face=None):
             nodes[index[parent]].setdefault("children", []).append(index[name])
 
     blob = bytearray()
-    buffer_views, accessors, samplers, channels = [], [], [], []
+    accessors, samplers, channels = [], [], []
     decoded = {}
     n = len(next(iter(local_tracks.values())))
     frame_times = [i / fps for i in range(n)]
+    reuse = {}
 
-    def add_view(data):
+    def add_accessor(fmt, values, spec):
+        """Acrescenta os dados a uma única bufferView e devolve o índice do accessor.
+
+        Dados iguais (como os tempos de trilhas com os mesmos quadros-chave) usam o
+        mesmo accessor. Num clipe, o JSON do glTF pesa mais que os dados binários.
+        """
+        data = struct.pack(f"<{len(values)}{fmt}", *values)
+        key = (data, spec["componentType"], spec["type"])
+        if key in reuse:
+            return reuse[key]
         while len(blob) % 4:
             blob.append(0)
-        buffer_views.append({"buffer": 0, "byteOffset": len(blob), "byteLength": len(data)})
+        accessors.append({"bufferView": 0, "byteOffset": len(blob), **spec})
         blob.extend(data)
-        return len(buffer_views) - 1
+        reuse[key] = len(accessors) - 1
+        return reuse[key]
+
+    def add_times(times):
+        spec = {"componentType": 5126, "count": len(times), "type": "SCALAR"}
+        return add_accessor("f", times, {**spec, "min": [min(times)], "max": [max(times)]})
+
+    def add_sampler(t_acc, v_acc, node, path):
+        samplers.append({"input": t_acc, "output": v_acc, "interpolation": "LINEAR"})
+        channels.append({"sampler": len(samplers) - 1, "target": {"node": node, "path": path}})
 
     for name in names:
         track = local_tracks[name]
@@ -600,56 +619,16 @@ def write_glb(path, local_tracks, fps, meta, tol_deg, contacts=(), face=None):
         times = [frame_times[i] for i in keep]
         keys = [quantize(track[i]) for i in keep]
         decoded[name] = decode_track(times, [dequantize(k) for k in keys], frame_times)
-        t_view = add_view(struct.pack(f"<{len(times)}f", *times))
-        accessors.append(
-            {
-                "bufferView": t_view,
-                "componentType": 5126,
-                "count": len(times),
-                "type": "SCALAR",
-                "min": [min(times)],
-                "max": [max(times)],
-            }
-        )
         flat = [c for k in keys for c in k]
-        q_view = add_view(struct.pack(f"<{len(flat)}h", *flat))
-        accessors.append(
-            {
-                "bufferView": q_view,
-                "componentType": 5122,
-                "normalized": True,
-                "count": len(keys),
-                "type": "VEC4",
-            }
+        q_acc = add_accessor(
+            "h", flat, {"componentType": 5122, "normalized": True, "count": len(keys), "type": "VEC4"}
         )
-        samplers.append(
-            {"input": len(accessors) - 2, "output": len(accessors) - 1, "interpolation": "LINEAR"}
-        )
-        channels.append(
-            {"sampler": len(samplers) - 1, "target": {"node": index[name], "path": "rotation"}}
-        )
+        add_sampler(add_times(times), q_acc, index[name], "rotation")
 
     def add_vec3_channel(node, times, values, path):
-        t_view = add_view(struct.pack(f"<{len(times)}f", *times))
-        accessors.append(
-            {
-                "bufferView": t_view,
-                "componentType": 5126,
-                "count": len(times),
-                "type": "SCALAR",
-                "min": [min(times)],
-                "max": [max(times)],
-            }
-        )
         flat = [c for v in values for c in v]
-        v_view = add_view(struct.pack(f"<{len(flat)}f", *flat))
-        accessors.append(
-            {"bufferView": v_view, "componentType": 5126, "count": len(values), "type": "VEC3"}
-        )
-        samplers.append(
-            {"input": len(accessors) - 2, "output": len(accessors) - 1, "interpolation": "LINEAR"}
-        )
-        channels.append({"sampler": len(samplers) - 1, "target": {"node": node, "path": path}})
+        v_acc = add_accessor("f", flat, {"componentType": 5126, "count": len(values), "type": "VEC3"})
+        add_sampler(add_times(times), v_acc, node, path)
 
     roots = [index["hips"]]
     for contact in contacts:
@@ -673,7 +652,6 @@ def write_glb(path, local_tracks, fps, meta, tol_deg, contacts=(), face=None):
             "version": "2.0",
             "generator": "AutoLibras vlibras_to_vrm.py",
             "copyright": "VLibras dictionary sources (LAViD/UFPB), GPL-3.0-only",
-            "extras": meta,
         },
         "scene": 0,
         "scenes": [{"nodes": roots}],
@@ -682,7 +660,7 @@ def write_glb(path, local_tracks, fps, meta, tol_deg, contacts=(), face=None):
             {"name": meta["name"], "samplers": samplers, "channels": channels, "extras": meta}
         ],
         "buffers": [{"byteLength": len(blob)}],
-        "bufferViews": buffer_views,
+        "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": len(blob)}],
         "accessors": accessors,
     }
     json_bytes = json.dumps(gltf, ensure_ascii=False, separators=(",", ":")).encode()

@@ -10,13 +10,15 @@ import { RemoteWhisperRecognizer, WebSpeechRecognizer } from "@autolibras/stt-we
 import {
   loadVLibrasVocabulary,
   VLibrasApiTranslator,
-  VLibrasWidgetRenderer,
+  type VLibrasAvatar,
 } from "@autolibras/vlibras";
+import { type AvatarHandle, type AvatarKind, createAvatar, SwitchableRenderer } from "./avatar";
 import {
   loadSettings,
   type RecognizerMode,
   type Settings,
   saveSettings,
+  signsUrlOf,
   type TranslatorMode,
 } from "./settings";
 
@@ -68,11 +70,18 @@ export class TranslatorController {
   dropped = $state(0);
   pending = $state(0);
   lastError = $state<string | null>(null);
+  /** Avatar em uso (pode diferir da configuração se faltar o pacote de sinais). */
+  avatarKind = $state<AvatarKind>("vlibras");
+  /** Canvas do avatar próprio, para a página mostrar; `null` com o VLibras. */
+  avatarCanvas = $state.raw<HTMLCanvasElement | null>(null);
 
   #recognizer!: SpeechRecognizer;
   #detachRecognizer = () => {};
-  readonly #renderer: VLibrasWidgetRenderer;
+  readonly #renderer = new SwitchableRenderer();
   readonly #pipeline: Pipeline;
+  #avatar?: AvatarHandle;
+  #avatarSigns = "";
+  #avatarRequest = 0;
 
   get speechSupported(): boolean {
     return this.settings.recognizer === "whisper"
@@ -81,7 +90,6 @@ export class TranslatorController {
   }
 
   constructor() {
-    this.#renderer = new VLibrasWidgetRenderer({ avatar: this.settings.avatar });
     this.#pipeline = new Pipeline({
       translator: createTranslator(this.settings.translator),
       renderer: this.#renderer,
@@ -117,13 +125,40 @@ export class TranslatorController {
     this.micState = "idle";
   }
 
+  /** Avatar a usar: o configurado, ou o VLibras se o próprio não tiver pacote de sinais. */
+  get #wantedAvatar(): AvatarKind {
+    return this.settings.avatarKind === "propio" && signsUrlOf(this.settings)
+      ? "propio"
+      : "vlibras";
+  }
+
+  /** Cria (ou troca) o avatar conforme a configuração e espera ele carregar. */
   async loadAvatar(): Promise<void> {
+    const request = ++this.#avatarRequest;
     this.avatarStatus = "carregando";
     try {
+      const kind = this.#wantedAvatar;
+      const signsUrl = kind === "propio" ? signsUrlOf(this.settings) : "";
+      // Um pacote novo precisa de um avatar novo (o renderer guarda o manifest).
+      if (this.#avatar?.kind !== kind || this.#avatarSigns !== signsUrl) {
+        const handle = await createAvatar(kind, { vlibrasAvatar: this.settings.avatar, signsUrl });
+        if (request !== this.#avatarRequest) {
+          handle.dispose();
+          return;
+        }
+        this.#avatar?.dispose();
+        this.#avatar = handle;
+        this.#avatarSigns = signsUrl;
+        this.#renderer.use(handle.renderer);
+        this.avatarKind = kind;
+        this.avatarCanvas = handle.canvas;
+      }
       await this.#renderer.load();
+      if (request !== this.#avatarRequest) return;
       this.#renderer.setSpeed(this.settings.baseSpeed);
       this.avatarStatus = "pronto";
     } catch (error) {
+      if (request !== this.#avatarRequest) return;
       this.avatarStatus = "erro";
       this.lastError = error instanceof Error ? error.message : String(error);
     }
@@ -170,7 +205,14 @@ export class TranslatorController {
       this.#pipeline.translator = createTranslator(changes.translator);
     }
     if (changes.avatar && changes.avatar !== previous.avatar) {
-      this.#renderer.setAvatar(changes.avatar);
+      const renderer = this.#avatar?.renderer as { setAvatar?: (a: VLibrasAvatar) => void };
+      renderer?.setAvatar?.(changes.avatar);
+    }
+    if (
+      (changes.avatarKind && changes.avatarKind !== previous.avatarKind) ||
+      (changes.signsUrl !== undefined && changes.signsUrl !== previous.signsUrl)
+    ) {
+      void this.loadAvatar();
     }
     if (changes.maxLagSeconds !== undefined || changes.baseSpeed !== undefined) {
       this.#pipeline.queue.setOptions({

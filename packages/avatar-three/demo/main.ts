@@ -1,9 +1,14 @@
-import { createVrmRenderer, type SignEvent } from "../src/index";
+import { createVrmRenderer, DEFAULT_AVATAR_URL, type SignEvent } from "../src/index";
 
-// `?signs=` e `?avatar=` permitem usar um pacote de sinais ou um modelo publicados em outro lugar.
+// `?signs=` e `?avatar=` permitem usar um pacote de sinais ou um modelo publicados em outro lugar;
+// `?bg=transparent` começa com o fundo transparente, como no overlay do OBS.
 const params = new URLSearchParams(location.search);
 const signsUrl = params.get("signs") ?? new URL("signs/", location.href).href;
-const avatarUrl = params.get("avatar") ?? new URL("avatar/autolibras.vrm", location.href).href;
+const avatarUrl = params.get("avatar") ?? DEFAULT_AVATAR_URL;
+const OPAQUE = "#eef2f6";
+const startTransparent = params.get("bg") === "transparent";
+/** Quantos sinais mostrar na lista (o pacote completo tem ~23 mil). */
+const MAX_CHIPS = 120;
 
 const EXAMPLES = [
   "OI [EXCLAMAÇÃO] EU NOME A N A [PONTO]",
@@ -12,6 +17,9 @@ const EXAMPLES = [
   "EU NÃO_GOSTAR ÁGUA [PONTO]",
   "OBRIGADO(+) [EXCLAMAÇÃO]",
   "EU CASA ONDE [INTERROGAÇÃO] SAPATO",
+  "EU FELIZ [EXCLAMAÇÃO] VOCÊ TRISTE [INTERROGAÇÃO]",
+  "ANNA TER 25 ANO [PONTO]",
+  "JOÃO MORAR 1.500 KM LONGE [PONTO]",
 ];
 
 function element<T extends HTMLElement>(id: string): T {
@@ -27,13 +35,23 @@ const stopButton = element<HTMLButtonElement>("stop");
 const speedInput = element<HTMLInputElement>("speed");
 const speedValue = element<HTMLOutputElement>("speed-value");
 const contactsInput = element<HTMLInputElement>("contacts");
+const faceInput = element<HTMLInputElement>("face");
+const transparentInput = element<HTMLInputElement>("transparent");
+const filterInput = element<HTMLInputElement>("filter");
 const status = element<HTMLDivElement>("status");
 const now = element<HTMLDivElement>("now");
 const packInfo = element<HTMLElement>("pack-info");
 const signList = element<HTMLDivElement>("signs");
 const examples = element<HTMLDivElement>("examples");
 
-const renderer = createVrmRenderer({ canvas, avatarUrl, signs: signsUrl });
+const renderer = createVrmRenderer({
+  canvas,
+  avatarUrl,
+  signs: signsUrl,
+  background: startTransparent ? null : OPAQUE,
+});
+transparentInput.checked = startTransparent;
+canvas.classList.toggle("transparent", startTransparent);
 // Para a verificação automática no navegador (demo/browser-check.mjs).
 Object.assign(window, { avatar: renderer });
 
@@ -68,6 +86,13 @@ speedInput.addEventListener("input", () => {
 // Desligar mostra a pose só com as rotações copiadas, sem o IK que leva a mão ao rosto,
 // ao peito ou à outra mão.
 contactsInput.addEventListener("change", () => renderer.setContacts(contactsInput.checked));
+// Expressões do próprio sinal (boca, bochechas, sobrancelhas gravadas nos clipes).
+faceInput.addEventListener("change", () => renderer.setFaceWeight(faceInput.checked ? 1 : 0));
+// O xadrez atrás do canvas mostra onde ele ficou transparente.
+transparentInput.addEventListener("change", () => {
+  renderer.setBackground(transparentInput.checked ? null : OPAQUE);
+  canvas.classList.toggle("transparent", transparentInput.checked);
+});
 for (const example of EXAMPLES) {
   const button = document.createElement("button");
   button.textContent = example;
@@ -83,14 +108,27 @@ try {
   const { manifest } = renderer.pack;
   const names = renderer.pack.names.sort((a, b) => a.localeCompare(b, "pt-BR"));
   packInfo.textContent = `Pacote de sinais: ${names.length} sinais, licença ${manifest.license}.`;
-  for (const name of names) {
-    const chip = document.createElement("button");
-    chip.textContent = name;
-    chip.addEventListener("click", () => {
-      glossInput.value = `${glossInput.value.trim()} ${name}`.trim();
-    });
-    signList.append(chip);
-  }
+  const showSigns = () => {
+    const query = filterInput.value.trim().toLocaleUpperCase("pt-BR");
+    const matches = query ? names.filter((n) => n.includes(query)) : names;
+    signList.replaceChildren(
+      ...matches.slice(0, MAX_CHIPS).map((name) => {
+        const chip = document.createElement("button");
+        chip.textContent = name;
+        chip.addEventListener("click", () => {
+          glossInput.value = `${glossInput.value.trim()} ${name}`.trim();
+        });
+        return chip;
+      }),
+    );
+    if (matches.length > MAX_CHIPS) {
+      const more = document.createElement("small");
+      more.textContent = `e mais ${matches.length - MAX_CHIPS}`;
+      signList.append(more);
+    }
+  };
+  filterInput.addEventListener("input", showSigns);
+  showSigns();
   playButton.disabled = false;
   setStatus("Pronto");
 } catch (error) {

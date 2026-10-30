@@ -12,7 +12,7 @@ O app usa estes serviços no navegador, mas não os redistribui.
 | Tradutor VLibras (`https://traducao2.vlibras.gov.br/translate`) | Tradução PT→glosa (opcional) | Serviço público sem API documentada, com os mesmos termos |
 | Lista de sinais do VLibras (`https://dicionario2.vlibras.gov.br/static/TREES/2018.3.1.json`) | Dicionário usado pelas regras locais, baixado uma vez e guardado no navegador | Dados do VLibras, com os mesmos termos; não ficam neste repositório |
 | Web Speech API | Reconhecimento de fala | Recurso do navegador; no Chrome, o Google processa o áudio |
-| Pacote de sinais do avatar próprio (`packages/avatar-three`, opcional) | Clipes de animação convertidos do [vlibras-dictionary-sources](https://gitlab.lavid.ufpb.br/vlibras-public/vlibras-dictionary/vlibras-dictionary-sources) (LAVID/UFPB), carregados por URL | GPL-3.0-or-later. Os clipes ficam fora deste repositório e são publicados à parte |
+| Pacote de sinais do avatar próprio (`packages/avatar-three`, opcional) | Clipes de animação convertidos do [vlibras-dictionary-sources](https://gitlab.lavid.ufpb.br/vlibras-public/vlibras-dictionary/vlibras-dictionary-sources) (LAVID/UFPB), carregados por URL | GPL-3.0 (o repositório de origem traz o texto da GPLv3 sem a cláusula "ou posterior", então o pacote usa GPL-3.0-only). Os clipes ficam fora deste repositório e são publicados à parte |
 
 O código de `packages/vlibras` foi escrito do zero com base no comportamento público do Widget (`window.VLibras.Widget` e `window.vlibras`) e não copia código LGPL.
 
@@ -35,7 +35,7 @@ O servidor em `services/stt-server` instala estas dependências pelo pip. O mode
 
 ## Modelo do avatar próprio
 
-`packages/avatar-three/demo/public/avatar/autolibras.vrm` foi gerado pelos scripts de `packages/avatar-three/tools/avatar` e é distribuído como CC0 (domínio público). Ele só usa assets CC0 do MakeHuman:
+`packages/avatar-three/assets/autolibras.vrm` foi gerado pelos scripts de `packages/avatar-three/tools/avatar` e é distribuído como CC0 (domínio público). Ele só usa assets CC0 do MakeHuman:
 
 | Asset | Origem | Licença |
 |---|---|---|

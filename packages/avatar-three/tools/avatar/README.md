@@ -1,6 +1,6 @@
 # Avatar AutoLibras
 
-Scripts que geram `demo/public/avatar/autolibras.vrm` (VRM 1.0, CC0) a partir do
+Scripts que geram `assets/autolibras.vrm` (VRM 1.0, CC0) a partir do
 MakeHuman/MPFB, rodando o Blender sem interface.
 
 ## Como gerar
@@ -29,7 +29,9 @@ expressões e direções da pose T.
 - Mapa humanoide completo, com todos os dedos, `jaw` e olhos.
 - Expressões (shape keys na malha `Body`): os presets do VRM (`happy`, `angry`, `sad`,
   `surprised`, `relaxed`, `blink`, `blinkLeft`, `blinkRight`, `aa`, `ih`, `ou`, `ee`, `oh`)
-  e duas customizadas: `browUp` (pergunta sim/não) e `browDown` (perguntas QU- e negação).
+  e as customizadas `browUp` (pergunta sim/não), `browDown` (perguntas QU- e negação) e
+  `mouthSmile`, `mouthFrown`, `mouthPucker`, `mouthPress`, `cheekPuff` e `cheekSuck`, que
+  reproduzem as expressões gravadas nos clipes dos sinais.
 - `licenseUrl` é a VPL 1.0, porque o three-vrm recusa outras URLs por padrão. A licença
   real fica em `otherLicenseUrl` (CC0), com todas as permissões liberadas.
 

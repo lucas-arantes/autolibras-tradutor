@@ -10,7 +10,12 @@
  * Mensagens enviadas ao `parent`, todas com `source: "autolibras-player"`:
  * `ready`, `error`, `gloss` (glosa de cada frase) e `queue` (atraso e fila).
  *
- * Parâmetros da URL: `translator=vlibras|regras` e `avatar=icaro|hosana|guga`.
+ * Parâmetros da URL:
+ * - `translator=vlibras|regras`;
+ * - `avatar=propio|vlibras`, ou um personagem do VLibras (`icaro`, `hosana`, `guga`). Sem
+ *   ele, vale o avatar próprio se houver pacote de sinais, senão o VLibras;
+ * - `signs=URL`: pacote de sinais do avatar próprio (padrão: o definido no build);
+ * - `bg=transparent` ou uma cor CSS: fundo do avatar próprio (padrão: transparente).
  */
 import { FallbackTranslator, Pipeline } from "@autolibras/core";
 import { RulesTranslator } from "@autolibras/gloss-rules";
@@ -18,8 +23,8 @@ import {
   loadVLibrasVocabulary,
   VLibrasApiTranslator,
   type VLibrasAvatar,
-  VLibrasWidgetRenderer,
 } from "@autolibras/vlibras";
+import { createAvatar, defaultAvatarKind, parseAvatarKind, SIGN_PACK_URL } from "./lib/avatar";
 
 const AVATARS: readonly VLibrasAvatar[] = ["icaro", "hosana", "guga"];
 
@@ -32,12 +37,29 @@ const translator =
   params.get("translator") === "regras"
     ? rules
     : new FallbackTranslator([new VLibrasApiTranslator(), rules]);
-const avatarParam = params.get("avatar") as VLibrasAvatar | null;
-const renderer = new VLibrasWidgetRenderer({
-  avatar: avatarParam && AVATARS.includes(avatarParam) ? avatarParam : "icaro",
-});
-const pipeline = new Pipeline({ translator, renderer });
+const avatarParam = params.get("avatar");
+const persona = AVATARS.find((a) => a === avatarParam);
+const signsUrl = params.get("signs")?.trim() || SIGN_PACK_URL;
+const kind = persona ? "vlibras" : (parseAvatarKind(avatarParam) ?? defaultAvatarKind(signsUrl));
+const bg = params.get("bg");
 const status = document.getElementById("status");
+if (status) {
+  status.textContent =
+    kind === "propio"
+      ? "Carregando o avatar e o pacote de sinais…"
+      : "Carregando o avatar do VLibras…";
+}
+const avatar = await createAvatar(kind, {
+  vlibrasAvatar: persona ?? "icaro",
+  signsUrl,
+  background: !bg || bg === "transparent" ? null : bg,
+});
+if (avatar.canvas) {
+  avatar.canvas.id = "avatar";
+  document.body.append(avatar.canvas);
+}
+const { renderer } = avatar;
+const pipeline = new Pipeline({ translator, renderer });
 
 function post(message: Record<string, unknown>): void {
   // Sem dados sensíveis: quem embute o player já conhece o texto que mandou.

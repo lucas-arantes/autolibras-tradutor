@@ -13,6 +13,13 @@
         overflow: hidden;
         font-family: system-ui, sans-serif;
       }
+      #avatar {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
       #status {
         position: fixed;
         inset: 0;
@@ -27,7 +34,7 @@
   </head>
   <body>
     <!-- Página só com o avatar, para ser embutida (extensão do navegador). -->
-    <p id="status">Carregando o avatar do VLibras…</p>
+    <p id="status">Carregando o avatar…</p>
     <script type="module" src="/src/player.ts"></script>
   </body>
 </html>

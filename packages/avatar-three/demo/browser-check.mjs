@@ -4,7 +4,7 @@
 //   node demo/browser-check.mjs [--out DIR] [--chromium /usr/bin/chromium] [glosa ...]
 //
 // Precisa do pacote de sinais em demo/public/signs (tools/clips/build_pack.py) e do
-// modelo em demo/public/avatar/autolibras.vrm.
+// modelo em assets/autolibras.vrm.
 import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";

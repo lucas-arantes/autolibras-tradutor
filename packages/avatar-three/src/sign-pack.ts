@@ -17,6 +17,30 @@ export type Pose = Map<string, Quaternion>;
 const CONTACT_NODE =
   /^contact_(left|right)_(face|chest|hand)_(wrist|palm|indexTip|middleTip|thumbTip)(?:_(wrist|palm|indexTip|middleTip|thumbTip))?$/;
 
+/**
+ * Canais de expressão não manual gravados pelo conversor (nós `face_<canal>`, peso de 0
+ * a 1 na escala). Vêm das shape keys do rosto do VLibras; ver FACE_CHANNELS no conversor.
+ */
+export const FACE_CHANNELS = [
+  "browRaise",
+  "browOuterUp",
+  "browLower",
+  "browFrown",
+  "browAngry",
+  "smile",
+  "frown",
+  "pucker",
+  "lipPress",
+  "upperLip",
+  "cheekPuff",
+  "cheekSuck",
+  "jawOpen",
+] as const;
+
+export type FaceChannel = (typeof FACE_CHANNELS)[number];
+
+const FACE_NODE = new RegExp(`^face_(${FACE_CHANNELS.join("|")})$`);
+
 interface ContactChannel {
   side: HandSide;
   anchor: ContactAnchor;
@@ -32,6 +56,7 @@ export class SignClip {
   readonly duration: number;
   readonly #tracks: Array<{ bone: string; interpolant: Interpolant }> = [];
   readonly #contacts = new Map<string, ContactChannel>();
+  readonly #face: Array<{ channel: FaceChannel; interpolant: Interpolant }> = [];
 
   constructor(name: string, clip: AnimationClip) {
     this.name = name;
@@ -41,6 +66,14 @@ export class SignClip {
       const contact = CONTACT_NODE.exec(track.name.slice(0, dot));
       if (contact && track instanceof VectorKeyframeTrack) {
         this.#addContactTrack(track, contact, track.name.slice(dot + 1));
+        continue;
+      }
+      const face = FACE_NODE.exec(track.name.slice(0, dot));
+      if (face?.[1] && track instanceof VectorKeyframeTrack) {
+        if (track.name.slice(dot + 1) === "scale") {
+          const interpolant = track.InterpolantFactoryMethodLinear();
+          this.#face.push({ channel: face[1] as FaceChannel, interpolant });
+        }
         continue;
       }
       if (
@@ -79,6 +112,29 @@ export class SignClip {
 
   get hasContacts(): boolean {
     return this.#contacts.size > 0;
+  }
+
+  /** Canais de expressão que o clipe anima. */
+  get faceChannels(): FaceChannel[] {
+    return this.#face.map((f) => f.channel);
+  }
+
+  /**
+   * Soma em `out` os canais de expressão no instante `time`, multiplicados por `weight`
+   * (no crossfade, cada sinal entra com o seu peso).
+   */
+  sampleFace(
+    time: number,
+    weight: number,
+    out: Map<FaceChannel, number>,
+  ): Map<FaceChannel, number> {
+    if (weight <= 0) return out;
+    const t = Math.min(Math.max(time, 0), this.duration);
+    for (const { channel, interpolant } of this.#face) {
+      const w = (interpolant.evaluate(t)[0] ?? 0) * weight;
+      if (w > 1e-3) out.set(channel, Math.min(1, (out.get(channel) ?? 0) + w));
+    }
+    return out;
   }
 
   /** Acrescenta a `out` os contatos ativos no instante `time`, com o peso multiplicado. */

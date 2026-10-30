@@ -1,6 +1,6 @@
-import { Quaternion, Vector3 } from "three";
+import { AnimationClip, Quaternion, Vector3, VectorKeyframeTrack } from "three";
 import { describe, expect, it } from "vitest";
-import { type Pose, SignPack } from "./sign-pack";
+import { type Pose, SignClip, SignPack } from "./sign-pack";
 
 /**
  * Monta um .glb no mesmo formato que `tools/clips/vlibras_to_vrm.py` grava: um nó por
@@ -87,5 +87,27 @@ describe("SignPack com o GLTFLoader", () => {
     const q = pose.get("leftIndexProximal") ?? new Quaternion();
     const expected = new Quaternion().setFromAxisAngle(axis, Math.PI / 4);
     expect(q.angleTo(expected)).toBeLessThan(0.001);
+  });
+});
+
+describe("SignClip com expressões", () => {
+  it("lê os canais do rosto e soma os pesos do crossfade", () => {
+    const clip = new AnimationClip("FELIZ", 1, [
+      new VectorKeyframeTrack("face_smile.scale", [0, 1], [0, 0, 0, 1, 1, 1]),
+      new VectorKeyframeTrack("face_browRaise.scale", [0], [0.4, 0.4, 0.4]),
+      // Nós desconhecidos e a translação dos canais são ignorados.
+      new VectorKeyframeTrack("face_wink.scale", [0], [1, 1, 1]),
+      new VectorKeyframeTrack("face_smile.position", [0], [1, 1, 1]),
+    ]);
+    const sign = new SignClip("FELIZ", clip);
+    expect(sign.faceChannels.sort()).toEqual(["browRaise", "smile"]);
+    expect(sign.bones).toEqual([]);
+    const face = sign.sampleFace(0.5, 1, new Map());
+    expect(face.get("smile")).toBeCloseTo(0.5);
+    expect(face.get("browRaise")).toBeCloseTo(0.4);
+    // Dois sinais no crossfade: os pesos somam, sem passar de 1.
+    sign.sampleFace(1, 0.8, face);
+    expect(face.get("smile")).toBeCloseTo(1);
+    expect(sign.sampleFace(0, 0, new Map()).size).toBe(0);
   });
 });

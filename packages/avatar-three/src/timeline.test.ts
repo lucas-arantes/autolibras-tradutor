@@ -28,6 +28,12 @@ const SIGNS: Record<string, SignInfo> = {
   NOME: info(2.3, 0.6, 1.5),
   A: info(1.6, 0.5, 1.1),
   N: info(1.6, 0.5, 1.1),
+  J: info(2, 0.5, 1.4),
+  "1": info(1.5, 0.5, 1),
+  "2": info(1.5, 0.5, 1),
+  "5": info(1.5, 0.5, 1),
+  MIL: info(2, 0.6, 1.4),
+  VÍRGULA: info(2, 0.6, 1.4),
 };
 
 const catalog: SignCatalog = { info: (name) => SIGNS[name], rest: "CASA" };
@@ -55,6 +61,33 @@ describe("resolveUnits", () => {
 
   it("pula só as letras que faltam", () => {
     expect(units("ANTA")).toEqual(["letter:A", "letter:N", "letter:A"]);
+  });
+
+  it("junta letras soltas seguidas numa palavra soletrada", () => {
+    const resolved = resolveUnits(parseGloss("EU NOME A N A CASA"), catalog);
+    const letters = resolved.filter((u) => u.kind === "letter");
+    expect(letters.map((u) => u.label)).toEqual(["A", "N", "A"]);
+    expect(new Set(letters.map((u) => u.word)).size).toBe(1);
+    // Uma letra sozinha continua sendo um sinal.
+    expect(units("EU A CASA")).toEqual(["sign:EU", "sign:A", "sign:CASA"]);
+  });
+
+  it("marca a letra repetida na mesma palavra", () => {
+    const resolved = resolveUnits(parseGloss("ANNA"), catalog);
+    expect(resolved.map((u) => [u.label, u.repeat ?? false])).toEqual([
+      ["A", false],
+      ["N", false],
+      ["N", true],
+      ["A", false],
+    ]);
+  });
+
+  it("sinaliza números algarismo por algarismo, com MIL e VÍRGULA", () => {
+    expect(units("EU 25 CASA")).toEqual(["sign:EU", "letter:2", "letter:5", "sign:CASA"]);
+    expect(units("25000")).toEqual(["letter:2", "letter:5", "sign:MIL"]);
+    expect(units("1,5")).toEqual(["letter:1", "sign:VÍRGULA", "letter:5"]);
+    expect(units("11")).toEqual(["letter:1", "letter:1"]);
+    expect(resolveUnits(parseGloss("11"), catalog)[1]?.repeat).toBe(true);
   });
 });
 
@@ -95,6 +128,20 @@ describe("buildTimeline", () => {
     ]);
   });
 
+  it("não corta o movimento das letras que se mexem", () => {
+    const { segments } = planGloss("CASA JA CASA", catalog);
+    const [j] = segments.filter((s) => s.unit.label === "J");
+    expect((j?.to ?? 0) - (j?.from ?? 0)).toBeCloseTo(0.9);
+  });
+
+  it("desliza a mão na letra repetida", () => {
+    const timeline = planGloss("ANNA", catalog);
+    const repeated = timeline.segments[2];
+    expect(timeline.hand).toEqual([
+      { kind: "shift", start: repeated?.start, end: repeated?.strokeEndAt },
+    ]);
+  });
+
   it("deixa os sinais intensos mais lentos", () => {
     const [segment] = planGloss("CASA(+)", catalog).segments;
     expect(segment?.rate).toBe(DEFAULT_TIMELINE_OPTIONS.intenseRate);
@@ -120,7 +167,12 @@ describe("buildTimeline", () => {
     expect(cue?.end).toBeGreaterThan(yesNo.segments[1]?.strokeEndAt ?? 0);
     expect(cue?.end).toBeLessThan(yesNo.duration);
 
-    expect(planGloss("QUAL NOME [INTERROGAÇÃO]", catalog).expressions[0]?.name).toBe("browDown");
+    expect(yesNo.head).toEqual([
+      expect.objectContaining({ kind: "tilt", pitch: DEFAULT_TIMELINE_OPTIONS.questionPitch }),
+    ]);
+    const wh = planGloss("QUAL NOME [INTERROGAÇÃO]", catalog);
+    expect(wh.expressions[0]?.name).toBe("browDown");
+    expect(wh.head[0]?.pitch).toBe(DEFAULT_TIMELINE_OPTIONS.whQuestionPitch);
     expect(planGloss("CASA [EXCLAMAÇÃO]", catalog).expressions[0]?.name).toBe("surprised");
 
     const negation = planGloss("EU NÃO_GOSTAR CASA", catalog);
@@ -143,6 +195,7 @@ describe("buildTimeline", () => {
       segments: [],
       expressions: [],
       head: [],
+      hand: [],
       duration: 0,
     });
   });

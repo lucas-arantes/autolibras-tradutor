@@ -35,6 +35,7 @@ const stopButton = element<HTMLButtonElement>("stop");
 const speedInput = element<HTMLInputElement>("speed");
 const speedValue = element<HTMLOutputElement>("speed-value");
 const contactsInput = element<HTMLInputElement>("contacts");
+const collisionsInput = element<HTMLInputElement>("collisions");
 const faceInput = element<HTMLInputElement>("face");
 const transparentInput = element<HTMLInputElement>("transparent");
 const filterInput = element<HTMLInputElement>("filter");
@@ -86,6 +87,7 @@ speedInput.addEventListener("input", () => {
 // Desligar mostra a pose só com as rotações copiadas, sem o IK que leva a mão ao rosto,
 // ao peito ou à outra mão.
 contactsInput.addEventListener("change", () => renderer.setContacts(contactsInput.checked));
+collisionsInput.addEventListener("change", () => renderer.setCollisions(collisionsInput.checked));
 // Expressões do próprio sinal (boca, bochechas, sobrancelhas gravadas nos clipes).
 faceInput.addEventListener("change", () => renderer.setFaceWeight(faceInput.checked ? 1 : 0));
 // O xadrez atrás do canvas mostra onde ele ficou transparente.

@@ -116,7 +116,7 @@ function targetOf(frame: AnchorFrame, contact: ContactSample): Vector3 {
 }
 
 /** Aplica a rotação `rotation` (em coordenadas de mundo) ao nó, mantendo o pai. */
-function rotateWorld(node: Object3D, rotation: Quaternion): void {
+export function rotateWorld(node: Object3D, rotation: Quaternion): void {
   const parent = node.parent?.getWorldQuaternion(new Quaternion()) ?? new Quaternion();
   node.quaternion
     .premultiply(parent)

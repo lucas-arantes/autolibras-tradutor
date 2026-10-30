@@ -104,6 +104,7 @@ class FakeStage implements AvatarStage {
   tick?: (dt: number) => void;
   frames: Array<{ pose: Pose; expressions: Map<string, number>; contacts: ContactSample[] }> = [];
   disposed = false;
+  collisions = true;
 
   constructor(expressions: string[] = ["surprised", "browDown", "happy"]) {
     this.expressionNames = expressions;
@@ -129,6 +130,10 @@ class FakeStage implements AvatarStage {
     return () => {
       this.tick = undefined;
     };
+  }
+
+  setCollisions(enabled: boolean): void {
+    this.collisions = enabled;
   }
 
   dispose(): void {
@@ -424,6 +429,14 @@ describe("VrmRenderer (contrato do AvatarRenderer)", () => {
     expect(stage.last.contacts).toEqual([]);
     renderer.stop();
     await play;
+  });
+
+  it("liga e desliga a correção de colisões do palco", async () => {
+    const { stage, renderer } = await setup();
+    renderer.setCollisions(false);
+    expect(stage.collisions).toBe(false);
+    renderer.setCollisions(true);
+    expect(stage.collisions).toBe(true);
   });
 
   it("funciona com a SignQueue do core", async () => {

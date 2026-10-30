@@ -39,6 +39,10 @@ As pálpebras e o olhar do VLibras ainda não são convertidos. O avatar pisca s
 
 O avatar tem proporções diferentes das do avatar do VLibras, então copiar só as rotações tira a mão do lugar nos sinais com contato: em OBRIGADO, por exemplo, a mão iria parar no cabelo, e não na testa. Por isso cada clipe também diz onde a mão está em relação ao rosto, ao peito ou à outra mão, na escala de cada um (distância entre os olhos, largura dos ombros, comprimento da mão). A cada quadro, um IK de dois ossos (braço e antebraço) leva a mão do avatar ao mesmo lugar relativo, sem mudar a orientação da mão, e o peso da correção cai conforme a mão se afasta. Nos 53 sinais convertidos até agora, sem a correção a mão fica em média a 8,3 cm do ponto certo no rosto, a 3,1 cm no peito e a 8,9 cm em relação à outra mão. Com ela, a distância fica abaixo de 1,5 cm. A demo tem uma opção para desligar a correção e comparar.
 
+O tronco do avatar também é mais fundo que o do VLibras, e as rotações copiadas, somadas aos contatos com o peito, faziam a mão entrar na camisa. Ao carregar o modelo, o palco ajusta volumes simples à malha em repouso (`src/collision.ts`). O tronco, o pescoço e a cabeça viram fatias horizontais de 2 cm, cada uma com o raio da roupa em 24 direções. Cada braço e antebraço vira uma cápsula, mais grossa perto do ombro e do cotovelo. A cada quadro, depois dos contatos, os pontos da mão (punho, palma, juntas e pontas dos dedos, cada um com um raio) são testados contra esses volumes. Se algum entrou, o punho anda o mínimo para todos ficarem do lado de fora, e o mesmo IK resolve o braço sem mudar a orientação da mão. A mão sai pela frente do corpo, onde fica o espaço de sinalização, a não ser que o caminho pelo lado seja bem mais curto. Uma mão que devia tocar o peito termina encostada nele. O empurrão começa meio centímetro antes da superfície e cresce aos poucos, para a mão não pular. Quando as mãos se tocam, as duas saem juntas, e uma mão que entrou no antebraço do outro lado divide o caminho com ele. Se o antebraço ainda entra no tronco, o cotovelo gira até 17° em volta da linha entre ombro e punho, o que não move a mão. Mais que isso deixaria o cotovelo na altura do ombro.
+
+Numa amostra de 369 sinais (333 palavras frequentes do português, as letras e os algarismos), tocados do repouso ao repouso a 30 quadros por segundo, sem a correção a mão entra mais de 1 cm no corpo em 133 sinais. Em 99 deles passa de 2 cm, e no pior, GOVERNO, chega a 21 cm. Somados, são 88 s dos 959 s tocados. Com a correção, sobram 3 sinais, por 0,1 s no total, e o pior fica em 4,5 cm num instante de BEBÊ. O antebraço entra mais de 1 cm no tronco em 143 sinais sem a correção e em 53 com ela; o que sobra é a manga encostada na camisa. A demo também tem uma opção para desligar essa correção.
+
 Fora dos sinais, o avatar respira devagar (tórax e ombros), para não ficar congelado.
 
 O renderer só calcula poses. Quem desenha é o `AvatarStage`: no navegador, `ThreeVrmStage`; nos testes, um palco falso com relógio manual.
@@ -103,9 +107,11 @@ A conversão (`tools/clips/vlibras_to_vrm.py`) roda no Blender headless:
 npm run dev -w @autolibras/avatar-three
 ```
 
-Abra http://localhost:5180. A demo usa `demo/public/signs` (gerado acima) e `assets/autolibras.vrm`. Os parâmetros `?signs=URL` e `?avatar=URL` trocam o pacote e o modelo, e `?bg=transparent` começa com o fundo transparente. Na página dá para ligar e desligar a correção de contatos, as expressões do sinal e o fundo transparente, além de procurar sinais no pacote.
+Abra http://localhost:5180. A demo usa `demo/public/signs` (gerado acima) e `assets/autolibras.vrm`. Os parâmetros `?signs=URL` e `?avatar=URL` trocam o pacote e o modelo, e `?bg=transparent` começa com o fundo transparente. Na página dá para ligar e desligar a correção de contatos, a que tira as mãos de dentro do corpo, as expressões do sinal e o fundo transparente, além de procurar sinais no pacote.
 
 `npm run check:browser -w @autolibras/avatar-three` abre a demo num Chromium headless com WebGL por software (SwiftShader), sinaliza algumas glosas e salva capturas de tela. Por padrão o script usa `/usr/bin/chromium`; outro caminho vai em `--chromium`.
+
+`node demo/collision-check.mjs` mede as mãos dentro do corpo. Ele toca uma amostra de sinais do pacote publicado com e sem a correção, imprime um resumo e os piores sinais e salva as medidas (`collision.json`) e imagens de antes e depois dos piores. Sinais na linha de comando trocam a amostra, e `--rank forearm` ordena pelo antebraço.
 
 ## Modelo
 

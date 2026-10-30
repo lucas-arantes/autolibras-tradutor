@@ -28,6 +28,8 @@ export interface AvatarStage {
   start(tick: (dt: number) => void): () => void;
   /** Troca o fundo; `null` deixa transparente (opcional). */
   setBackground?(background: string | null): void;
+  /** Liga ou desliga a correção de colisões das mãos com o corpo (opcional). */
+  setCollisions?(enabled: boolean): void;
   dispose(): void;
 }
 
@@ -275,6 +277,11 @@ export class VrmRenderer extends Emitter<VrmRendererEvents> implements AvatarRen
   /** Liga ou desliga a correção de contatos (útil para comparar). */
   setContacts(enabled: boolean): void {
     this.#contacts = enabled;
+  }
+
+  /** Liga ou desliga a correção que tira as mãos de dentro do corpo (útil para comparar). */
+  setCollisions(enabled: boolean): void {
+    this.#stage.setCollisions?.(enabled);
   }
 
   /** Para o laço de desenho e libera o palco. */

@@ -65,8 +65,13 @@ function onSubmit(event: SubmitEvent) {
 
       {#if !app.speechSupported}
         <p class="hint">
-          Este navegador não tem reconhecimento de fala. Use Chrome, Edge ou Safari, ou digite o texto
-          abaixo.
+          {#if app.settings.recognizer === "whisper"}
+            Este navegador não permite capturar o microfone para o servidor Whisper. Digite o texto
+            abaixo.
+          {:else}
+            Este navegador não tem reconhecimento de fala. Use Chrome, Edge ou Safari, escolha o
+            servidor Whisper nas configurações ou digite o texto abaixo.
+          {/if}
         </p>
       {/if}
 
@@ -117,7 +122,8 @@ function onSubmit(event: SubmitEvent) {
         A tradução automática é um apoio e <strong>não substitui intérpretes de Libras</strong>.
       </p>
       <p>
-        No Chrome, o áudio do microfone é enviado ao Google para transcrição. Com o tradutor VLibras, o
+        Com o reconhecimento do navegador, o Chrome envia o áudio do microfone ao Google. Com o
+        servidor Whisper, o áudio vai só para o endereço configurado. Com o tradutor VLibras, o
         texto transcrito é enviado aos servidores do VLibras (governo federal).
       </p>
     </section>

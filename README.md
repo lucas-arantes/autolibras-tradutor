@@ -2,15 +2,15 @@
 
 O AutoLibras Tradutor ouve português falado e mostra a tradução em Libras (Língua Brasileira de Sinais) com um avatar 3D, enquanto a pessoa fala. A fala vira texto, o texto vira glosa de Libras e o avatar sinaliza a glosa.
 
-O projeto está no começo. Por enquanto existe só a versão web, publicada em https://lucas-arantes.github.io/autolibras-tradutor/. Para falar em vez de digitar, use Chrome, Edge ou Safari.
+O projeto está no começo. Por enquanto existe a versão web, publicada em https://lucas-arantes.github.io/autolibras-tradutor/, e um servidor de transcrição opcional. Para falar em vez de digitar, use Chrome, Edge ou Safari, ou rode o servidor.
 
 ## Como funciona
 
 ```text
-Microfone ─► Web Speech API (pt-BR) ─► Texto ─► Glosa (VLibras ou regras locais) ─► Fila ─► Avatar VLibras
+Microfone ─► Web Speech API ou servidor Whisper ─► Texto ─► Glosa (VLibras ou regras locais) ─► Fila ─► Avatar VLibras
 ```
 
-O navegador transcreve a fala de forma contínua com a Web Speech API. Os resultados parciais aparecem como legenda antes de a frase terminar.
+A fala pode ser transcrita de dois jeitos. O padrão é a Web Speech API do navegador, que não exige instalar nada. A outra opção é o [servidor de transcrição do projeto](services/stt-server/README.md), que usa o Whisper e pode rodar no seu computador, assim o áudio não sai da máquina. Nos dois casos, os resultados parciais aparecem como legenda antes de a frase terminar.
 
 Cada frase transcrita vai para o tradutor de glosa do VLibras. Se ele falhar ou levar mais de 4 segundos, o app usa um tradutor de regras próprio, que roda no navegador. Também dá para usar só as regras, sem enviar o texto a nenhum servidor.
 
@@ -48,17 +48,19 @@ Abra http://localhost:5173. O avatar precisa de WebGL e leva alguns segundos par
 packages/
   core/          Interfaces (reconhecedor, tradutor, avatar), Pipeline, SignQueue, FallbackTranslator
   gloss-rules/   Tradutor PT→glosa por regras (verbos, plurais, números, expressões)
-  stt-web/       Reconhecimento de fala via Web Speech API
+  stt-web/       Reconhecimento de fala: Web Speech API e cliente do servidor Whisper
   vlibras/       Adaptadores do VLibras: API de tradução, avatar do Widget, proteção contra captura de cliques
 apps/
   web/           PWA em Svelte 5 + Vite
+services/
+  stt-server/    Servidor de transcrição em Python (Whisper, VAD, WebSocket)
 ```
 
-Cada etapa implementa uma interface definida em `@autolibras/core`. Por isso dá para trocar o reconhecedor de fala (por um baseado em Whisper, por exemplo), o tradutor ou o avatar sem mexer nas outras etapas.
+Cada etapa implementa uma interface definida em `@autolibras/core`. Por isso dá para trocar o reconhecedor de fala, o tradutor ou o avatar sem mexer nas outras etapas.
 
 ## Limitações conhecidas
 
-No Chrome, a Web Speech API envia o áudio do microfone para os servidores do Google. O Firefox não tem essa API; nele, use o campo de texto.
+No Chrome, a Web Speech API envia o áudio do microfone para os servidores do Google. O Firefox não tem essa API; nele, use o servidor Whisper ou o campo de texto. O servidor Whisper precisa de uma máquina razoável: numa CPU de 12 threads, o modelo `small` acompanhou a fala, mas os modelos maiores pedem GPU.
 
 O tradutor e o avatar dependem de serviços públicos do VLibras que não têm API documentada nem garantia de disponibilidade. Os termos de uso do VLibras pedem consulta prévia para uso comercial ou eleitoral.
 

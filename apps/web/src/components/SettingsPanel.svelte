@@ -1,9 +1,22 @@
 <script lang="ts">
 import type { VLibrasAvatar } from "@autolibras/vlibras";
-import type { Settings, TranslatorMode } from "../lib/settings";
+import type { RecognizerMode, Settings, TranslatorMode } from "../lib/settings";
 
 let { settings, onChange }: { settings: Settings; onChange: (changes: Partial<Settings>) => void } =
   $props();
+
+const recognizers: Array<{ value: RecognizerMode; label: string; hint: string }> = [
+  {
+    value: "web-speech",
+    label: "Navegador",
+    hint: "Sem instalar nada. No Chrome, o áudio é processado pelo Google.",
+  },
+  {
+    value: "whisper",
+    label: "Servidor Whisper",
+    hint: "O áudio vai só para o servidor indicado, que pode rodar no seu computador.",
+  },
+];
 
 const translators: Array<{ value: TranslatorMode; label: string; hint: string }> = [
   { value: "vlibras", label: "VLibras", hint: "Melhor qualidade; usa regras locais se falhar." },
@@ -19,6 +32,40 @@ const avatars: Array<{ value: VLibrasAvatar; label: string }> = [
 
 <section class="card settings" aria-label="Configurações">
   <h2>Configurações</h2>
+
+  <fieldset>
+    <legend>Reconhecimento de fala</legend>
+    {#each recognizers as option (option.value)}
+      <label class="choice">
+        <input
+          type="radio"
+          name="recognizer"
+          value={option.value}
+          checked={settings.recognizer === option.value}
+          onchange={() => onChange({ recognizer: option.value })}
+        />
+        <span>
+          <strong>{option.label}</strong>
+          <small>{option.hint}</small>
+        </span>
+      </label>
+    {/each}
+    {#if settings.recognizer === "whisper"}
+      <label class="field url">
+        <span>Endereço do servidor</span>
+        <input
+          type="url"
+          value={settings.whisperUrl}
+          spellcheck="false"
+          onchange={(event) => onChange({ whisperUrl: event.currentTarget.value.trim() })}
+        />
+        <small>
+          Se o servidor roda neste computador, o Chrome pede permissão para o site acessar serviços
+          do dispositivo. É preciso permitir.
+        </small>
+      </label>
+    {/if}
+  </fieldset>
 
   <fieldset>
     <legend>Tradutor de glosa</legend>
@@ -130,6 +177,20 @@ const avatars: Array<{ value: VLibrasAvatar; label: string }> = [
 
   .field:last-child {
     margin-bottom: 0;
+  }
+
+  .url {
+    margin: 0.25rem 0 0;
+  }
+
+  .url input {
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
   }
 
   input[type="range"] {

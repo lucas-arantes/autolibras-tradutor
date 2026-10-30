@@ -1,8 +1,12 @@
 import type { VLibrasAvatar } from "@autolibras/vlibras";
 
 export type TranslatorMode = "vlibras" | "regras";
+export type RecognizerMode = "web-speech" | "whisper";
 
 export interface Settings {
+  recognizer: RecognizerMode;
+  /** Endereço do servidor Whisper (`services/stt-server`). */
+  whisperUrl: string;
   translator: TranslatorMode;
   avatar: VLibrasAvatar;
   /** Atraso máximo antes de descartar frases antigas, em segundos. */
@@ -12,6 +16,8 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  recognizer: "web-speech",
+  whisperUrl: "ws://localhost:8000/v1/stream",
   translator: "vlibras",
   avatar: "icaro",
   maxLagSeconds: 15,

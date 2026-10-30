@@ -3,11 +3,18 @@ import {
   type GlossTranslator,
   Pipeline,
   type RecognizerState,
+  type SpeechRecognizer,
 } from "@autolibras/core";
 import { RulesTranslator } from "@autolibras/gloss-rules";
-import { WebSpeechRecognizer } from "@autolibras/stt-web";
+import { RemoteWhisperRecognizer, WebSpeechRecognizer } from "@autolibras/stt-web";
 import { VLibrasApiTranslator, VLibrasWidgetRenderer } from "@autolibras/vlibras";
-import { loadSettings, type Settings, saveSettings, type TranslatorMode } from "./settings";
+import {
+  loadSettings,
+  type RecognizerMode,
+  type Settings,
+  saveSettings,
+  type TranslatorMode,
+} from "./settings";
 
 export type EntryStatus =
   | "traduzindo"
@@ -36,9 +43,14 @@ function createTranslator(mode: TranslatorMode): GlossTranslator {
   return mode === "vlibras" ? new FallbackTranslator([new VLibrasApiTranslator(), rules]) : rules;
 }
 
+function createRecognizer(mode: RecognizerMode, whisperUrl: string): SpeechRecognizer {
+  return mode === "whisper"
+    ? new RemoteWhisperRecognizer({ url: whisperUrl })
+    : new WebSpeechRecognizer();
+}
+
 /** Estado reativo do app e ligação entre reconhecedor, pipeline e avatar. */
 export class TranslatorController {
-  readonly speechSupported = WebSpeechRecognizer.isSupported();
   settings = $state<Settings>(loadSettings());
   micState = $state<RecognizerState>("idle");
   listening = $state(false);
@@ -51,9 +63,16 @@ export class TranslatorController {
   pending = $state(0);
   lastError = $state<string | null>(null);
 
-  readonly #recognizer = new WebSpeechRecognizer();
+  #recognizer!: SpeechRecognizer;
+  #detachRecognizer = () => {};
   readonly #renderer: VLibrasWidgetRenderer;
   readonly #pipeline: Pipeline;
+
+  get speechSupported(): boolean {
+    return this.settings.recognizer === "whisper"
+      ? RemoteWhisperRecognizer.isSupported()
+      : WebSpeechRecognizer.isSupported();
+  }
 
   constructor() {
     this.#renderer = new VLibrasWidgetRenderer({ avatar: this.settings.avatar });
@@ -62,8 +81,30 @@ export class TranslatorController {
       renderer: this.#renderer,
       queue: { maxLagSeconds: this.settings.maxLagSeconds, baseSpeed: this.settings.baseSpeed },
     });
-    this.#pipeline.attach(this.#recognizer);
+    this.#useRecognizer();
     this.#bindEvents();
+  }
+
+  /** Troca o reconhecedor de fala conforme a configuração, parando o anterior. */
+  #useRecognizer(): void {
+    if (this.listening) {
+      this.#recognizer.stop();
+      this.listening = false;
+      this.partial = "";
+    }
+    this.#detachRecognizer();
+    const recognizer = createRecognizer(this.settings.recognizer, this.settings.whisperUrl);
+    const detachPipeline = this.#pipeline.attach(recognizer);
+    const detachState = recognizer.on("state", (state) => {
+      this.micState = state;
+      if (state === "error") this.listening = false;
+    });
+    this.#detachRecognizer = () => {
+      detachPipeline();
+      detachState();
+    };
+    this.#recognizer = recognizer;
+    this.micState = "idle";
   }
 
   async loadAvatar(): Promise<void> {
@@ -109,6 +150,12 @@ export class TranslatorController {
     const previous = this.settings;
     this.settings = { ...previous, ...changes };
     saveSettings(this.settings);
+    if (
+      (changes.recognizer && changes.recognizer !== previous.recognizer) ||
+      (changes.whisperUrl !== undefined && changes.whisperUrl !== previous.whisperUrl)
+    ) {
+      this.#useRecognizer();
+    }
     if (changes.translator && changes.translator !== previous.translator) {
       this.#pipeline.translator = createTranslator(changes.translator);
     }
@@ -135,11 +182,6 @@ export class TranslatorController {
 
   #bindEvents(): void {
     const pipeline = this.#pipeline;
-
-    this.#recognizer.on("state", (state) => {
-      this.micState = state;
-      if (state === "error") this.listening = false;
-    });
 
     pipeline.on("transcript", (segment) => {
       if (!segment.isFinal) {

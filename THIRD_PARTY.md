@@ -14,6 +14,20 @@ O app usa estes serviços no navegador, mas não os redistribui.
 
 O código de `packages/vlibras` foi escrito do zero com base no comportamento público do Widget (`window.VLibras.Widget` e `window.vlibras`) e não copia código LGPL.
 
+## Servidor de transcrição
+
+O servidor em `services/stt-server` instala estas dependências pelo pip. O modelo Whisper é baixado na primeira execução e não faz parte do repositório.
+
+| Componente | Uso | Licença |
+|---|---|---|
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Transcrição com o Whisper | MIT |
+| Modelos [Whisper](https://github.com/openai/whisper) da OpenAI | Pesos do modelo | MIT |
+| [Silero VAD](https://github.com/snakers4/silero-vad), incluído no faster-whisper | Detecção de fala | MIT |
+| CTranslate2 e ONNX Runtime | Execução dos modelos | MIT |
+| FastAPI | Servidor HTTP e WebSocket | MIT |
+| Uvicorn | Servidor ASGI | BSD-3-Clause |
+| NumPy | Processamento do áudio | BSD-3-Clause |
+
 ## Dependências de desenvolvimento e build
 
 Todas são instaladas pelo npm e têm licenças permissivas: Svelte (MIT), Vite (MIT), Vitest (MIT), TypeScript (Apache-2.0), Biome (MIT/Apache-2.0) e jsdom (MIT).

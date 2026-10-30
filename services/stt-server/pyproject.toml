@@ -1,0 +1,37 @@
+[project]
+name = "autolibras-stt"
+version = "0.1.0"
+description = "Servidor de transcrição de fala em português (Whisper) para o AutoLibras Tradutor"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+  "faster-whisper>=1.2.1,<2",
+  "fastapi>=0.162",
+  "uvicorn[standard]>=0.54",
+  "numpy>=2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.28", "ruff>=0.13"]
+
+[project.scripts]
+autolibras-stt = "autolibras_stt.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/autolibras_stt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["integration: usa o modelo Whisper real (AUTOLIBRAS_INTEGRATION=1)"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

@@ -72,6 +72,28 @@ describe("Pipeline", () => {
     expect(renderer.played).toEqual(["OLÁ"]);
   });
 
+  it("clear descarta traduções que ainda estavam em andamento", async () => {
+    const renderer = new FakeRenderer();
+    const slow: GlossTranslator = {
+      name: "lento",
+      translate: (text) =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve({ gloss: text.toUpperCase(), source: "lento" }), 10),
+        ),
+    };
+    const pipeline = new Pipeline({ translator: slow, renderer });
+    const dropped: string[] = [];
+    pipeline.on("drop", (items) => dropped.push(...items.map((i) => i.text)));
+    pipeline.submitText("antes");
+    pipeline.clear();
+    pipeline.submitText("depois");
+    await new Promise((r) => setTimeout(r, 30));
+    await pipeline.idle();
+    await flush();
+    expect(dropped).toEqual(["antes"]);
+    expect(renderer.played).toEqual(["DEPOIS"]);
+  });
+
   it("reporta erro de tradução sem travar as próximas", async () => {
     const renderer = new FakeRenderer();
     const pipeline = new Pipeline({ translator: failing, renderer });

@@ -53,6 +53,8 @@ export class Pipeline extends Emitter<PipelineEvents> {
   translator: GlossTranslator;
   #order: Promise<void> = Promise.resolve();
   #textCount = 0;
+  /** Incrementado por `clear()`; traduções iniciadas antes disso não entram na fila. */
+  #generation = 0;
 
   constructor({ translator, renderer, queue }: PipelineOptions) {
     super();
@@ -89,8 +91,9 @@ export class Pipeline extends Emitter<PipelineEvents> {
     return id;
   }
 
-  /** Esvazia a fila e para o avatar. */
+  /** Esvazia a fila, para o avatar e descarta as traduções ainda em andamento. */
   clear(): void {
+    this.#generation++;
     this.queue.clear();
   }
 
@@ -102,6 +105,7 @@ export class Pipeline extends Emitter<PipelineEvents> {
   #translate(id: string, text: string): void {
     const trimmed = text.trim();
     if (!trimmed) return;
+    const generation = this.#generation;
     const settled: Promise<Settled> = this.translator.translate(trimmed).then(
       (result) => ({ ok: true, result }),
       (error: unknown) => ({ ok: false, error: toError(error) }),
@@ -115,7 +119,10 @@ export class Pipeline extends Emitter<PipelineEvents> {
       }
       const { gloss, source } = outcome.result;
       this.emit("gloss", { id, text: trimmed, gloss, source });
-      if (countSigns(gloss) > 0) this.queue.enqueue({ id, text: trimmed, gloss });
+      if (countSigns(gloss) === 0) return;
+      const item = { id, text: trimmed, gloss };
+      if (generation === this.#generation) this.queue.enqueue(item);
+      else this.emit("drop", [item]);
     });
   }
 }

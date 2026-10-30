@@ -21,6 +21,18 @@ describe("VLibrasApiTranslator", () => {
     expect(requests).toEqual([{ text: "Eu estudo." }]);
   });
 
+  it("lê a glosa quando a API responde em JSON", async () => {
+    // Resposta real do endpoint para "Qual é o seu nome?" (29/10/2026).
+    const body =
+      '{"traducao":"QUAL SEU NOME [INTERROGAÇÃO]","sentimentoGeral":"ERRO_API_GERAL","sentimentoPorSentenca":[]}';
+    const translator = new VLibrasApiTranslator({ fetch: async () => new Response(body) });
+    expect((await translator.translate("Qual é o seu nome?")).gloss).toBe(
+      "QUAL SEU NOME [INTERROGAÇÃO]",
+    );
+    const unknown = new VLibrasApiTranslator({ fetch: async () => new Response('{"erro":1}') });
+    await expect(unknown.translate("oi")).rejects.toThrow("formato inesperado");
+  });
+
   it("falha com status de erro ou glosa vazia", async () => {
     const error = new VLibrasApiTranslator({
       fetch: async () => new Response("", { status: 503 }),

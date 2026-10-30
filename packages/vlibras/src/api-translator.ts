@@ -8,6 +8,22 @@ export interface VLibrasApiTranslatorOptions {
 }
 
 /**
+ * O endpoint responde com a glosa em texto puro ou, em algumas frases, com JSON
+ * (`{"traducao": "...", "sentimentoGeral": ...}`), sempre como `text/html`.
+ */
+function extractGloss(body: string): string {
+  const trimmed = body.trim();
+  if (!trimmed.startsWith("{")) return trimmed;
+  try {
+    const parsed = JSON.parse(trimmed) as { traducao?: unknown };
+    if (typeof parsed.traducao === "string") return parsed.traducao.trim();
+  } catch {
+    // Cai no erro abaixo: melhor usar o tradutor de reserva do que sinalizar JSON.
+  }
+  throw new Error("VLibras devolveu uma resposta em formato inesperado");
+}
+
+/**
  * Tradutor PT→glosa do VLibras, via o mesmo endpoint usado pelo Widget oficial.
  * Não há API documentada nem SLA: use com um tradutor local de reserva.
  */
@@ -29,7 +45,7 @@ export class VLibrasApiTranslator implements GlossTranslator {
       signal,
     });
     if (!response.ok) throw new Error(`VLibras respondeu com status ${response.status}`);
-    const gloss = (await response.text()).trim();
+    const gloss = extractGloss(await response.text());
     if (!gloss) throw new Error("VLibras devolveu uma glosa vazia");
     return { gloss, source: this.name };
   }

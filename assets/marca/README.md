@@ -21,6 +21,8 @@ O símbolo é um balão de fala com uma mão aberta que sai pela borda de cima: 
 
 O nome está convertido em curvas, então os SVG não dependem de fonte instalada.
 
+O site usa cópias destes arquivos em `apps/web/public` (`icon.svg`, `favicon.ico`, os PNG do manifesto e o `apple-touch-icon.png`), e a extensão, em `apps/extension/public/icons`. Ao mudar a marca, atualize as cópias também.
+
 ## Cores
 
 | Nome | Hex | Onde |

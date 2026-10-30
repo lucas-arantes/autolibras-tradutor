@@ -1,8 +1,17 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/imagens/banner-escuro.png" />
+    <img src="docs/imagens/banner-claro.png" alt="AutoLibras: tradução automática de português falado para Libras, com um avatar 3D que sinaliza enquanto a pessoa fala." />
+  </picture>
+</p>
+
 # AutoLibras Tradutor
 
 O AutoLibras Tradutor ouve português falado e mostra a tradução em Libras (Língua Brasileira de Sinais) com um avatar 3D, enquanto a pessoa fala. A fala vira texto, o texto vira glosa de Libras e o avatar sinaliza a glosa.
 
 O projeto está no começo. Por enquanto existem a versão web, publicada em https://lucas-arantes.github.io/autolibras-tradutor/, uma extensão do Chrome que traduz o áudio de outras abas (YouTube, Meet), um servidor de transcrição opcional, um overlay para pôr o avatar em transmissões ao vivo pelo OBS e um botão Libras para players de vídeo. Para falar em vez de digitar, use Chrome, Edge ou Safari, ou rode o servidor.
+
+![O tradutor no navegador: a frase digitada aparece no histórico com a glosa, e o avatar a sinaliza ao lado.](docs/imagens/captura-app.png)
 
 ## Como funciona
 
@@ -34,10 +43,14 @@ No Estúdio (http://localhost:8000/studio.html), você escolhe a fonte: um dispo
 
 O Estúdio também dá um link para o público dizer se entendeu a tradução, e mostra as respostas durante a live. O botão Libras dos players de vídeo pode mandar a mesma avaliação.
 
+![Uma transmissão de exemplo com o avatar no canto e a frase embaixo dele.](docs/imagens/captura-overlay-obs.png)
+
 O overlay usa o avatar próprio, com fundo transparente e o tradutor de regras local, sem depender dos serviços do VLibras. Os sinais vêm do [pacote publicado](https://github.com/lucas-arantes/autolibras-sinais), ou de uma pasta local, para quem não quer depender da internet. O avatar do VLibras também pode ser escolhido, mas os termos de uso do VLibras não autorizam tradução automática em produções audiovisuais, então ele fica para testes.
 
 
 ## Libras sob demanda em vídeos
+
+![Um vídeo com o botão Libras ligado: o avatar sinaliza a legenda no canto do player.](docs/imagens/captura-assista.png)
 
 O pacote [`@autolibras/closed-signing`](packages/closed-signing/README.md) põe um botão Libras em players de vídeo, como o da legenda oculta. Ligado, o avatar próprio aparece num canto do vídeo e sinaliza a legenda em português, no tempo dela. Serve para vídeos gravados e para lives em HLS com legenda WebVTT, e não precisa de servidor do AutoLibras. O site publica a biblioteca em `closed-signing.js`, e a página `assista.html` mostra um exemplo com hls.js.
 ## Como rodar

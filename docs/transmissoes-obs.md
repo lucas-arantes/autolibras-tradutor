@@ -33,6 +33,8 @@ Para conferir, abra <http://localhost:8000/health>. Deve aparecer `"status":"ok"
 
 Abra <http://localhost:8000/studio.html> num navegador atualizado.
 
+![O Estúdio, com o servidor pronto e as opções de fonte da tradução.](imagens/captura-estudio.png)
+
 Em **Fonte da tradução**, escolha uma das opções:
 
 - **Dispositivo de áudio deste computador**: o microfone de quem fala, a mesa de som ou a placa de captura. Clique em **Listar dispositivos** e escolha o certo. Se o som da live só existe dentro do OBS (vídeo, música, convidados), mande o monitor de áudio do OBS para um cabo virtual e escolha o cabo aqui: [VB-CABLE](https://vb-audio.com/Cable/) no Windows, [BlackHole](https://github.com/ExistentialAudio/BlackHole) no macOS e um `null-sink` do PipeWire ou do PulseAudio no Linux. A aba do Estúdio precisa ficar aberta durante a live.
@@ -47,6 +49,8 @@ Clique em **Iniciar tradução**. Quando alguém falar, a transcrição aparece 
 2. No OBS, em **Fontes**, clique em **+** e escolha **Navegador**.
 3. Cole o endereço em **URL**. Com o avatar próprio, use **Largura** 400 e **Altura** 600; com o do VLibras, 260 e 380. Confirme.
 4. Arraste a fonte para um canto da cena e amplie pelas bordas, se quiser.
+
+![O avatar no canto de uma transmissão, com a frase embaixo dele.](imagens/captura-overlay-obs.png)
 
 O endereço do overlay não muda de uma live para outra, então esta etapa é feita uma vez só. Para trocar o avatar ou mostrar a frase embaixo dele, mude as opções no Estúdio e copie o endereço de novo.
 

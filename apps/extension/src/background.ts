@@ -23,7 +23,7 @@ async function setSession(session: Session | null): Promise<void> {
   if (session) await chrome.storage.session.set({ session });
   else await chrome.storage.session.remove("session");
   await chrome.action.setBadgeText({ text: session ? "ON" : "" });
-  await chrome.action.setBadgeBackgroundColor({ color: "#0b5cad" });
+  await chrome.action.setBadgeBackgroundColor({ color: "#0f6e78" });
 }
 
 async function ensureOffscreen(): Promise<void> {

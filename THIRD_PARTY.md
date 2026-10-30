@@ -50,4 +50,4 @@ O campo `licenseUrl` do arquivo aponta para a VRM Public License 1.0, porque a e
 
 ## Dependências de desenvolvimento e build
 
-Todas são instaladas pelo npm e têm licenças permissivas: Svelte (MIT), Vite (MIT), Vitest (MIT), TypeScript (Apache-2.0), Biome (MIT/Apache-2.0), jsdom (MIT), @types/chrome (MIT), three.js (MIT), @pixiv/three-vrm (MIT) e playwright-core (Apache-2.0, só na verificação da demo). A conversão dos sinais e o build do avatar usam o Blender (GPL-2.0-or-later) como programa externo.
+Todas são instaladas pelo npm e têm licenças permissivas: hls.js (Apache-2.0, incluído no build do app para tocar HLS na página `assista.html`), Svelte (MIT), Vite (MIT), Vitest (MIT), TypeScript (Apache-2.0), Biome (MIT/Apache-2.0), jsdom (MIT), @types/chrome (MIT), three.js (MIT), @pixiv/three-vrm (MIT) e playwright-core (Apache-2.0, só na verificação da demo). A conversão dos sinais e o build do avatar usam o Blender (GPL-2.0-or-later) como programa externo.

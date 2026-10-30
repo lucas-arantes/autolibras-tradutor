@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Assista a um vídeo com o avatar sinalizando a legenda em Libras." />
+    <meta name="theme-color" content="#0b5cad" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <title>AutoLibras · assistir com Libras</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <img src="/icon.svg" alt="" width="36" height="36" />
+          <div>
+            <h1>Assistir com Libras</h1>
+            <p>O avatar sinaliza a legenda em português do vídeo, no tempo dela</p>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main class="watch">
+      <div class="player">
+        <!-- biome-ignore lint/a11y/useMediaCaption: a faixa de legenda é posta pelo script, conforme o vídeo escolhido -->
+        <video id="video" controls playsinline crossorigin="anonymous"></video>
+      </div>
+      <div class="bar">
+        <span id="button-slot"></span>
+        <span id="status" class="muted" aria-live="polite"></span>
+      </div>
+      <form id="form" class="card">
+        <label class="field">
+          <span>Vídeo (arquivo ou HLS .m3u8)</span>
+          <input name="video" type="url" required spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>Legenda em WebVTT, se ela não vier no vídeo</span>
+          <input name="legendas" type="url" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>Pacote de sinais</span>
+          <input name="signs" type="url" spellcheck="false" />
+        </label>
+        <button type="submit" class="secondary">Abrir</button>
+      </form>
+      <section class="card notice">
+        <p>
+          Para usar no seu site, importe <code>closed-signing.js</code> deste endereço e chame
+          <code>attachClosedSigning(video, { signs })</code>. O vídeo precisa de legenda em
+          português, como faixa do próprio vídeo ou do player.
+        </p>
+      </section>
+    </main>
+    <script type="module" src="/src/assista.ts"></script>
+  </body>
+</html>

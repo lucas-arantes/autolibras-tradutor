@@ -34,6 +34,10 @@ No Estúdio (http://localhost:8000/studio.html), você escolhe a fonte: um dispo
 
 O overlay usa o avatar próprio, com fundo transparente e o tradutor de regras local, sem depender dos serviços do VLibras. Ele precisa de um pacote de sinais, que o servidor serve a partir da pasta `sinais`. O avatar do VLibras também pode ser escolhido, mas os termos de uso do VLibras não autorizam tradução automática em produções audiovisuais, então ele fica para testes.
 
+
+## Libras sob demanda em vídeos
+
+O pacote [`@autolibras/closed-signing`](packages/closed-signing/README.md) põe um botão Libras em players de vídeo, como o da legenda oculta. Ligado, o avatar próprio aparece num canto do vídeo e sinaliza a legenda em português, no tempo dela. Serve para vídeos gravados e para lives em HLS com legenda WebVTT, e não precisa de servidor do AutoLibras. O site publica a biblioteca em `closed-signing.js`, e a página `assista.html` mostra um exemplo com hls.js.
 ## Como rodar
 
 Você precisa do Node.js 22 ou mais recente. Para o reconhecimento de fala, use Chrome, Edge ou Safari.
@@ -66,6 +70,7 @@ packages/
   gloss-rules/   Tradutor PT→glosa por regras (verbos, plurais, números, expressões), com ou sem o dicionário de sinais
   stt-web/       Reconhecimento de fala: Web Speech API, cliente do servidor Whisper e das sessões de transmissão
   vlibras/       Adaptadores do VLibras: API de tradução, avatar do Widget, proteção contra captura de cliques
+  closed-signing/ Libras sob demanda em players de vídeo: o avatar sinaliza a legenda do vídeo
   avatar-three/  Avatar próprio em VRM (three.js), que o app pode usar no lugar do VLibras
 apps/
   web/           PWA em Svelte 5 + Vite. Também tem player.html (o avatar sozinho, usado pela extensão),

@@ -13,10 +13,12 @@
   },
   "dependencies": {
     "@autolibras/avatar-three": "*",
+    "@autolibras/closed-signing": "*",
     "@autolibras/core": "*",
     "@autolibras/gloss-rules": "*",
     "@autolibras/stt-web": "*",
-    "@autolibras/vlibras": "*"
+    "@autolibras/vlibras": "*",
+    "hls.js": "^1.7.4"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",

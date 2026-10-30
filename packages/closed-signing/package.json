@@ -1,0 +1,17 @@
+{
+  "name": "@autolibras/closed-signing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Libras sob demanda em players de vídeo: o avatar próprio sinaliza a legenda em português do vídeo, em sincronia",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@autolibras/avatar-three": "*",
+    "@autolibras/core": "*",
+    "@autolibras/gloss-rules": "*",
+    "@autolibras/vlibras": "*"
+  }
+}

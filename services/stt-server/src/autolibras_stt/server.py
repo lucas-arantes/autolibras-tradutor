@@ -19,12 +19,16 @@ from pydantic import BaseModel, Field
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 from . import protocol
+from .composer import CompositionOptions, composition_available
 from .config import Settings
 from .engine import Engine
 from .feedback import Feedback, FeedbackStore, RateLimiter
-from .sessions import Session, SessionError, SessionHub
+from .sessions import ComposerConfig, Session, SessionError, SessionHub
 from .streaming import StreamingOptions, StreamingSession
 from .vad import Vad
+
+# Pacote de sinais usado pela janela composta quando o servidor não tem um local.
+PUBLISHED_SIGNS = "https://lucas-arantes.github.io/autolibras-sinais/BR/"
 
 log = logging.getLogger("autolibras_stt")
 
@@ -32,8 +36,18 @@ log = logging.getLogger("autolibras_stt")
 MAX_CHUNK_BYTES = 10 * protocol.SAMPLE_RATE * 2
 
 
+class CompositionRequest(BaseModel):
+    output: str
+    delay: float = 8.0
+    position: Literal["right", "left"] = "right"
+    size: float = 0.5
+    background: Literal["painel", "recorte"] = "painel"
+    caption: bool = True
+    resolution: str = "1280x720"
+
+
 class SourceRequest(BaseModel):
-    type: Literal["audio", "url", "text"]
+    type: Literal["audio", "url", "text", "rtmp"]
     url: str | None = None
     # Vídeo gravado: o ffmpeg lê na velocidade real, como se fosse ao vivo.
     realtime: bool = False
@@ -52,6 +66,8 @@ class SessionRequest(BaseModel):
     # Id fixo escolhido pelo Estúdio, para a URL do overlay no OBS não mudar.
     # Se já existir, a sessão antiga é encerrada e substituída.
     id: str | None = None
+    # Com ela, o servidor devolve a transmissão com a janela de Libras embutida.
+    composition: CompositionRequest | None = None
 
 
 def create_app(
@@ -69,7 +85,27 @@ def create_app(
         async with semaphore:
             return await asyncio.to_thread(step)
 
-    hub = SessionHub(engine, vad, run, options, settings.max_sessions, ffmpeg)
+    web_served = bool(settings.web_dir) and Path(settings.web_dir).is_dir()
+    signs_served = (
+        bool(settings.signs_dir) and (Path(settings.signs_dir) / "manifest.json").is_file()
+    )
+
+    # A janela composta é a página broadcast.html, aberta pelo próprio servidor.
+    page_base = f"http://127.0.0.1:{settings.port}"
+    composer_problem = (
+        composition_available(ffmpeg, settings.chromium)
+        if web_served
+        else "o servidor não serve o app (defina AUTOLIBRAS_WEB_DIR)"
+    )
+    composer = ComposerConfig(
+        page_base=page_base,
+        signs_url=settings.signs_url
+        or (f"{page_base}/signs/" if signs_served else PUBLISHED_SIGNS),
+        chromium=settings.chromium,
+        rtmp_port=settings.rtmp_port,
+        unavailable=composer_problem,
+    )
+    hub = SessionHub(engine, vad, run, options, settings.max_sessions, ffmpeg, composer=composer)
     feedback = FeedbackStore(settings.data_dir)
     feedback_limit = RateLimiter(per_minute=10)
     app.state.hub = hub
@@ -105,11 +141,6 @@ def create_app(
         await websocket.accept()
         return True
 
-    web_served = bool(settings.web_dir) and Path(settings.web_dir).is_dir()
-    signs_served = (
-        bool(settings.signs_dir) and (Path(settings.signs_dir) / "manifest.json").is_file()
-    )
-
     @app.get("/health")
     async def health() -> dict[str, Any]:
         return {
@@ -120,6 +151,8 @@ def create_app(
             "tokenRequired": bool(settings.token),
             "web": web_served,
             "signs": signs_served,
+            "composition": composer_problem is None,
+            "compositionError": composer_problem,
         }
 
     # Transcrição avulsa ------------------------------------------------------
@@ -162,6 +195,19 @@ def create_app(
             await _close_with_error(websocket)
 
     # Sessões de transmissão --------------------------------------------------
+
+    def rtmp_info(session: Session, request: Request) -> dict[str, Any]:
+        """Onde o OBS deve enviar a transmissão. Só vai para quem tem o token: a chave
+        deixa qualquer um transmitir pela sessão."""
+        if session.source != "rtmp":
+            return {}
+        host = request.url.hostname or "localhost"
+        return {
+            "rtmp": {
+                "server": f"rtmp://{host}:{settings.rtmp_port}/live",
+                "key": session.stream_key,
+            }
+        }
 
     def find(session_id: str) -> Session:
         session = hub.get(session_id)
@@ -228,6 +274,11 @@ def create_app(
                 body.source.realtime,
                 session_id=body.id,
                 captions=body.source.captions,
+                composition=(
+                    CompositionOptions(**body.composition.model_dump())
+                    if body.composition
+                    else None
+                ),
             )
         except SessionError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
@@ -237,12 +288,12 @@ def create_app(
         }
         if session.source in ("audio", "text"):
             links["ingest"] = f"/v1/sessions/{session.id}/ingest"
-        return {**session.info(), **links}
+        return {**session.info(), **links, **rtmp_info(session, request)}
 
     @app.get("/v1/sessions")
     async def list_sessions(request: Request) -> list[dict[str, Any]]:
         require_token(request)
-        return [session.info() for session in hub.sessions.values()]
+        return [{**s.info(), **rtmp_info(s, request)} for s in hub.sessions.values()]
 
     @app.get("/v1/sessions/{session_id}")
     async def get_session(session_id: str) -> dict[str, Any]:

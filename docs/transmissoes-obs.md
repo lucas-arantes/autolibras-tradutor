@@ -62,6 +62,19 @@ Na fala corrida, sem pausas, cada frase sai assim que termina com ponto, interro
 
 Para encerrar, clique em **Parar** no Estúdio. O avatar para de sinalizar e volta a funcionar sozinho na próxima vez que você iniciar, sem mexer no OBS.
 
+## Live com a janela de Libras embutida (YouTube, Twitch)
+
+Em vez do overlay no OBS, o servidor pode receber a live do OBS, juntar a janela de Libras ao vídeo e mandar o resultado para a plataforma. A live sai alguns segundos atrasada, e esse atraso faz o sinal aparecer junto com a fala, sem configurar nada no OBS.
+
+1. No Estúdio, em **Fonte da tradução**, escolha **Transmissão enviada pelo OBS (RTMP)**.
+2. Em **Janela de Libras no vídeo**, marque **Enviar a transmissão com a janela de Libras** e cole em **Para onde enviar** o servidor e a chave de transmissão da plataforma, juntos: no YouTube, por exemplo, `rtmp://a.rtmp.youtube.com/live2/` seguido da chave. Escolha o lado, a altura e o fundo da janela.
+3. Clique em **Iniciar tradução**. O Estúdio mostra um servidor e uma chave.
+4. No OBS, em **Configurações → Transmissão**, escolha o serviço **Personalizado**, cole o servidor e a chave do Estúdio e inicie a transmissão.
+
+A plataforma recebe a live com o atraso escolhido (8 segundos, por padrão) e com a janela no canto. O atraso precisa cobrir o tempo que a fala leva para virar sinal: o Estúdio mostra quanto as frases estão levando. Se a transmissão já vai para um servidor RTMP, SRT ou HLS seu, use **Endereço da transmissão** como fonte em vez do RTMP do OBS.
+
+Juntar a janela pesa no processador: o servidor desenha o avatar e codifica o vídeo de novo, além de reconhecer a fala. Num computador doméstico, use 720p e deixe o servidor numa máquina diferente da do OBS, se puder. Cada servidor faz uma composição por vez, e a porta 1935 precisa estar livre.
+
 ## Modo sincronizado
 
 No modo normal, o avatar sinaliza alguns segundos depois da fala. Se o seu sistema de produção consegue atrasar o vídeo e o áudio da transmissão sem atrasar o overlay, o avatar pode sinalizar junto com a fala: marque **Modo sincronizado** no Estúdio e informe o atraso, em segundos. O overlay passa a começar cada frase esse tanto depois de ela ter sido dita.

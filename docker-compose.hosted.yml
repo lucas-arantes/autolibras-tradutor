@@ -8,6 +8,9 @@ services:
     environment:
       # Na internet, a senha é obrigatória.
       AUTOLIBRAS_TOKEN: ${AUTOLIBRAS_TOKEN:?defina AUTOLIBRAS_TOKEN}
+    ports:
+      # RTMP aberto para o OBS de quem transmite; cada sessão tem a própria chave.
+      - "1935:1935"
 
   https:
     image: caddy:2

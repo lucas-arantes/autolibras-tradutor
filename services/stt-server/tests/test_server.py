@@ -37,6 +37,8 @@ def test_health(client: TestClient) -> None:
         "tokenRequired": False,
         "web": False,
         "signs": False,
+        "composition": False,
+        "compositionError": "o servidor não serve o app (defina AUTOLIBRAS_WEB_DIR)",
     }
 
 

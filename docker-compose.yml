@@ -13,6 +13,8 @@ services:
       # Só este computador acessa. Para abrir o Estúdio de outro computador da
       # rede, troque por "8000:8000" e defina AUTOLIBRAS_TOKEN.
       - "127.0.0.1:8000:8000"
+      # RTMP: o OBS envia a live para cá quando o servidor junta a janela de Libras.
+      - "127.0.0.1:1935:1935"
     environment:
       # small roda bem em CPU; base é mais rápido, medium é mais preciso.
       AUTOLIBRAS_MODEL: ${AUTOLIBRAS_MODEL:-small}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  compositionBody,
   defaultSettings,
   feedbackPageUrl,
   ingestUrl,
@@ -129,5 +130,26 @@ describe("Estúdio", () => {
     expect(
       feedbackPageUrl("http://localhost:8000", "abc123", "https://site.test/app/", false),
     ).toBe("https://site.test/app/feedback.html?f=abc123&server=http%3A%2F%2Flocalhost%3A8000");
+  });
+
+  it("pede a composição só quando ligada e com fonte de vídeo", () => {
+    const base = defaultSettings("", false);
+    expect(compositionBody({ ...base, source: "rtmp" })).toBeUndefined();
+    const on = {
+      ...base.composition,
+      enabled: true,
+      output: " rtmp://a.rtmp.youtube.test/live2/chave ",
+      delay: 10,
+    };
+    expect(compositionBody({ source: "rtmp", composition: on })).toEqual({
+      output: "rtmp://a.rtmp.youtube.test/live2/chave",
+      delay: 10,
+      position: "right",
+      size: 0.5,
+      background: "painel",
+      caption: true,
+      resolution: "1280x720",
+    });
+    expect(compositionBody({ source: "audio", composition: on })).toBeUndefined();
   });
 });

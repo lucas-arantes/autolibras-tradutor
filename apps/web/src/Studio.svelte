@@ -38,6 +38,9 @@ let feedback = $state<FeedbackList | null>(null);
 let feedbackCopied = $state(false);
 // A chave fica guardada depois de parar, para o link continuar valendo na próxima live.
 let feedbackKey = $state("");
+// Endereço e chave para o OBS (fonte RTMP); só vêm na resposta de criação da sessão.
+let rtmpTarget = $state<{ server: string; key: string } | null>(null);
+let rtmpCopied = $state("");
 let sentTexts = $state<string[]>([]);
 
 let recognizer: RemoteWhisperRecognizer | undefined;
@@ -91,6 +94,7 @@ async function start(): Promise<void> {
     health = await api.health();
     session = await api.create($state.snapshot(settings));
     feedbackKey = session.feedbackKey;
+    rtmpTarget = session.rtmp ?? null;
     if (settings.source === "audio") startAudio();
     running = true;
     poll = setInterval(refresh, 3_000);
@@ -181,6 +185,18 @@ async function sendText(event: SubmitEvent): Promise<void> {
 function useRecommendedDelay(): void {
   if (session?.latency) settings.syncDelay = session.latency.recommendedDelay;
 }
+
+async function copyText(label: string, text: string): Promise<void> {
+  await navigator.clipboard.writeText(text);
+  rtmpCopied = label;
+  setTimeout(() => (rtmpCopied = ""), 2_000);
+}
+
+const compositionStateLabel: Record<string, string> = {
+  starting: "esperando a transmissão",
+  live: "ao vivo",
+  ended: "encerrada",
+};
 
 async function copy(): Promise<void> {
   await navigator.clipboard.writeText(overlay);
@@ -319,6 +335,16 @@ onDestroy(() => {
         </div>
       {/if}
       <label class="choice">
+        <input type="radio" bind:group={settings.source} value="rtmp" />
+        <span>
+          <strong>Transmissão enviada pelo OBS (RTMP)</strong>
+          <small>
+            O OBS transmite para o servidor do AutoLibras em vez de ir direto para a plataforma. Com a
+            janela de Libras no vídeo (seção 4), o servidor repassa a live já com a janela.
+          </small>
+        </span>
+      </label>
+      <label class="choice">
         <input type="radio" bind:group={settings.source} value="text" />
         <span>
           <strong>Texto</strong>
@@ -347,6 +373,26 @@ onDestroy(() => {
       <p class="caption partial" aria-live="polite">
         {transcript || "A transcrição aparece aqui quando alguém falar."}
       </p>
+    {/if}
+    {#if running && settings.source === "rtmp" && rtmpTarget}
+      <div class="fields obs-target">
+        <p class="muted">
+          No OBS, em <em>Configurações → Transmissão</em>, escolha o serviço <em>Personalizado</em> e
+          use:
+        </p>
+        <div class="row">
+          <input type="text" readonly value={rtmpTarget.server} aria-label="Servidor RTMP para o OBS" />
+          <button type="button" class="secondary" onclick={() => copyText("servidor", rtmpTarget?.server ?? "")}>
+            {rtmpCopied === "servidor" ? "Copiado" : "Copiar servidor"}
+          </button>
+        </div>
+        <div class="row">
+          <input type="password" readonly value={rtmpTarget.key} aria-label="Chave de transmissão para o OBS" />
+          <button type="button" class="secondary" onclick={() => copyText("chave", rtmpTarget?.key ?? "")}>
+            {rtmpCopied === "chave" ? "Copiado" : "Copiar chave"}
+          </button>
+        </div>
+      </div>
     {/if}
     {#if running && settings.source === "text"}
       <form class="fields text-form" onsubmit={sendText}>
@@ -471,7 +517,96 @@ onDestroy(() => {
   </section>
 
   <section class="card">
-    <h2>4. Retorno do público</h2>
+    <h2>4. Janela de Libras no vídeo (opcional)</h2>
+    {#if health && !health.composition}
+      <p class="muted">
+        Este servidor não junta a janela de Libras ao vídeo: {health.compositionError ??
+          "recurso indisponível"}.
+      </p>
+    {:else}
+      <fieldset class="fields" disabled={running}>
+        <p class="muted">
+          Em vez do overlay no OBS, o servidor pode devolver a transmissão já com a janela de Libras,
+          atrasada para o sinal sair junto com a fala, e enviá-la à plataforma. Funciona com as fontes
+          "Endereço da transmissão" e "Transmissão enviada pelo OBS".
+        </p>
+        <label class="check">
+          <input type="checkbox" bind:checked={settings.composition.enabled} />
+          Enviar a transmissão com a janela de Libras
+        </label>
+        {#if settings.composition.enabled}
+          <label class="field">
+            <span>Para onde enviar (servidor e chave da plataforma)</span>
+            <input
+              type="password"
+              bind:value={settings.composition.output}
+              placeholder="rtmp://a.rtmp.youtube.com/live2/sua-chave"
+              spellcheck="false"
+              autocomplete="off"
+            />
+            <small class="muted">
+              Junte o endereço do servidor e a chave de transmissão da plataforma (YouTube, Twitch ou
+              outro RTMP ou SRT), separados por "/".
+            </small>
+          </label>
+          <div class="row wrap">
+            <label class="check">
+              Atraso
+              <input type="number" min="2" max="30" class="seconds" bind:value={settings.composition.delay} />
+              segundos
+            </label>
+            <label class="check">
+              Lado
+              <select bind:value={settings.composition.position}>
+                <option value="right">Direita</option>
+                <option value="left">Esquerda</option>
+              </select>
+            </label>
+            <label class="check">
+              Altura
+              <select bind:value={settings.composition.size}>
+                <option value={0.3}>30%</option>
+                <option value={0.4}>40%</option>
+                <option value={0.5}>50%</option>
+                <option value={0.6}>60%</option>
+              </select>
+            </label>
+            <label class="check">
+              Fundo
+              <select bind:value={settings.composition.background}>
+                <option value="painel">Painel</option>
+                <option value="recorte">Só o avatar</option>
+              </select>
+            </label>
+            <label class="check">
+              Resolução
+              <select bind:value={settings.composition.resolution}>
+                <option value="1280x720">720p</option>
+                <option value="1920x1080">1080p</option>
+              </select>
+            </label>
+            <label class="check">
+              <input type="checkbox" bind:checked={settings.composition.caption} />
+              Frase na janela
+            </label>
+          </div>
+          <small class="muted">
+            O atraso precisa cobrir o tempo que a fala leva para virar sinal; com o servidor em CPU,
+            comece com 8 segundos. A plataforma recebe a live esse tanto mais tarde.
+          </small>
+        {/if}
+      </fieldset>
+      {#if running && session?.composition}
+        <p class="muted">
+          Composição: {compositionStateLabel[session.composition.state] ?? session.composition.state}
+          ({session.composition.frames} quadros da janela enviados).
+        </p>
+      {/if}
+    {/if}
+  </section>
+
+  <section class="card">
+    <h2>5. Retorno do público</h2>
     {#if feedbackLink}
       <div class="fields">
         <p class="muted">
@@ -603,6 +738,9 @@ onDestroy(() => {
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
+  }
+  .obs-target {
+    margin-top: 1rem;
   }
   .server-missing {
     margin-top: 0.75rem;

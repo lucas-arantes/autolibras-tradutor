@@ -12,7 +12,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.28", "ruff>=0.13"]
+# Composição no servidor: a transmissão sai com a janela de Libras embutida.
+composicao = ["playwright>=1.50"]
+dev = ["pytest>=8", "httpx>=0.28", "ruff>=0.13", "playwright>=1.50"]
 
 [project.scripts]
 autolibras-stt = "autolibras_stt.__main__:main"

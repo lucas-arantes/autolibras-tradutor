@@ -63,6 +63,9 @@ Tudo é configurado por variáveis de ambiente.
 | `AUTOLIBRAS_TOKEN` | vazio | Senha para criar, listar e apagar sessões e para enviar áudio a elas. Vazio: sem senha. Defina sempre que o servidor estiver acessível pela rede |
 | `AUTOLIBRAS_WEB_DIR` | vazio (`/app/web` no Docker) | Pasta com o build do app web, servida na raiz |
 | `AUTOLIBRAS_DATA_DIR` | vazio (`/data` no Docker Compose) | Pasta onde fica o retorno do público (`feedback.jsonl`). Vazio: só os últimos 1000 ficam na memória |
+| `AUTOLIBRAS_RTMP_PORT` | `1935` | Porta em que o servidor recebe o RTMP do OBS (fonte `rtmp`) |
+| `AUTOLIBRAS_CHROMIUM` | vazio | Chromium usado na composição. Vazio: o do sistema ou o baixado pelo Playwright |
+| `AUTOLIBRAS_SIGNS_URL` | vazio | Pacote de sinais da janela composta. Vazio: o servido em `/signs/` ou o pacote publicado |
 | `AUTOLIBRAS_SIGNS_DIR` | vazio (`/signs` no Docker Compose) | Pacote de sinais do avatar próprio (pasta com `manifest.json`), servido em `/signs/` |
 
 ## Desempenho
@@ -93,7 +96,7 @@ Uma sessão tem uma entrada de áudio e quantos assinantes quiser. O id dela fun
 
 | Rota | O que faz |
 |---|---|
-| `POST /v1/sessions` | Cria uma sessão. Corpo: `{"source": {"type": "audio"}}`, `{"source": {"type": "text"}}` ou `{"source": {"type": "url", "url": "rtmp://…", "realtime": false, "captions": false}}`. O campo opcional `id` (16 a 64 letras, números, `-` ou `_`) fixa o id; se já existir uma sessão com ele, a antiga é encerrada. `realtime` faz o ffmpeg ler um vídeo gravado na velocidade normal. Com `captions`, a sessão usa a legenda da transmissão em vez da fala: primeiro a faixa WebVTT de um `.m3u8` (de preferência em português) e, sem ela, o closed caption CEA-608 embutido no vídeo |
+| `POST /v1/sessions` | Cria uma sessão. Corpo: `{"source": {"type": "audio"}}`, `{"source": {"type": "text"}}`, `{"source": {"type": "rtmp"}}` (o OBS envia a live para o servidor; a resposta traz `rtmp.server` e `rtmp.key`) ou `{"source": {"type": "url", "url": "rtmp://…", "realtime": false, "captions": false}}`. O campo opcional `id` (16 a 64 letras, números, `-` ou `_`) fixa o id; se já existir uma sessão com ele, a antiga é encerrada. `realtime` faz o ffmpeg ler um vídeo gravado na velocidade normal. Com `captions`, a sessão usa a legenda da transmissão em vez da fala: primeiro a faixa WebVTT de um `.m3u8` (de preferência em português) e, sem ela, o closed caption CEA-608 embutido no vídeo |
 | `GET /v1/sessions` | Lista as sessões |
 | `GET /v1/sessions/{id}` | Estado da sessão (`waiting`, `live`, `ended` ou `error`), número de assinantes e `latency`: segundos do começo da fala até o final sair, nas últimas 50 frases (`p50`, `p95`) e o atraso sugerido para o modo sincronizado (`recommendedDelay`). Não pede token |
 | `DELETE /v1/sessions/{id}` | Encerra a sessão e fecha as conexões dos assinantes |
@@ -104,6 +107,29 @@ Uma sessão tem uma entrada de áudio e quantos assinantes quiser. O id dela fun
 Os `final` das sessões trazem também `wallStart` e `wallEnd`, o horário (epoch, em segundos, no relógio do servidor) em que a fala começou e terminou, e `serverTime`, o horário do envio. O servidor estima esse horário pela chegada do áudio. Com eles, o overlay faz o modo sincronizado: com `atraso=N`, cada frase começa N segundos depois de ter sido dita, e o `serverTime` corrige a diferença entre os relógios do servidor e do computador do overlay.
 
 Na fala corrida, uma frase completa (terminada em `.`, `?` ou `!`) que se repetiu em duas hipóteses seguidas sai como `final` sem esperar a pausa. Nesse caso, `start` e `end` são estimados pela proporção de palavras.
+
+### Composição: a live com a janela de Libras embutida
+
+Com `composition` no corpo do `POST /v1/sessions` e uma fonte `url` ou `rtmp`, o servidor junta a janela de Libras ao vídeo e manda o resultado para outro endereço:
+
+```json
+{
+  "source": {"type": "rtmp"},
+  "composition": {
+    "output": "rtmp://a.rtmp.youtube.com/live2/CHAVE",
+    "delay": 8,
+    "position": "right",
+    "size": 0.5,
+    "background": "painel",
+    "caption": true,
+    "resolution": "1280x720"
+  }
+}
+```
+
+O ffmpeg lê a entrada e a divide em duas: o áudio vai para o reconhecimento de fala, e o vídeo fica `delay` segundos para trás, ainda comprimido. A janela é a página `broadcast.html`, aberta num Chromium sem tela no modo sincronizado (`atraso=delay`), com o avatar próprio. Os quadros dela saem a 30 por segundo, contados a partir do mesmo relógio que marca as frases, e um segundo ffmpeg junta janela e vídeo, codifica em H.264 e AAC e envia para `output` (`rtmp://`, `rtmps://` ou `srt://`). `background: "recorte"` tira o fundo da janela e deixa só o avatar sobre o vídeo.
+
+A composição precisa do ffmpeg, do pacote `playwright` (`pip install -e ".[composicao]"`), de um Chromium (`python -m playwright install chromium`, ou o do sistema) e do app web servido pelo próprio servidor (`AUTOLIBRAS_WEB_DIR`). O `/health` diz se ela está disponível (`composition`) e, se não, por quê (`compositionError`); `python -m autolibras_stt.composer --check` faz a mesma conferência e testa o WebGL. Cada servidor faz uma composição por vez. O estado dela aparece em `composition` no `GET /v1/sessions/{id}`, sem a chave do endereço de saída.
 
 ### Retorno do público
 

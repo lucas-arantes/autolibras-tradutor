@@ -25,7 +25,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HF_HOME=/models \
     AUTOLIBRAS_HOST=0.0.0.0 \
     AUTOLIBRAS_PORT=8000 \
-    AUTOLIBRAS_WEB_DIR=/app/web
+    AUTOLIBRAS_WEB_DIR=/app/web \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
@@ -34,7 +35,11 @@ RUN apt-get update \
 WORKDIR /app
 COPY services/stt-server/pyproject.toml ./
 COPY services/stt-server/src ./src
-RUN pip install --no-cache-dir . \
+# Com o Playwright e o Chromium dele, o servidor também compõe a janela de Libras
+# no vídeo (transmissão com a janela embutida).
+RUN pip install --no-cache-dir ".[composicao]" \
+    && python -m playwright install --with-deps chromium \
+    && chmod -R a+rX /opt/playwright \
     && useradd --create-home --uid 1000 app \
     && mkdir -p /models /data \
     && chown app /models /data
@@ -42,7 +47,7 @@ COPY --from=web /src/apps/web/dist ./web
 
 USER app
 VOLUME /models /data
-EXPOSE 8000
+EXPOSE 8000 1935
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
 CMD ["autolibras-stt"]

@@ -23,6 +23,7 @@ from urllib.parse import urlparse
 
 from . import protocol
 from .captions import CaptionError, follow_embedded_captions, follow_hls_captions
+from .composer import CompositionError, CompositionOptions, Compositor, window_page_url
 from .engine import Engine
 from .feedback import feedback_key
 from .streaming import StreamingOptions, StreamingSession
@@ -30,7 +31,7 @@ from .vad import Vad
 
 log = logging.getLogger("autolibras_stt.sessions")
 
-SourceType = Literal["audio", "url", "text"]
+SourceType = Literal["audio", "url", "text", "rtmp"]
 SessionState = Literal["waiting", "live", "ended", "error"]
 
 # Protocolos que o ffmpeg pode abrir numa sessão por endereço. Arquivos locais
@@ -101,6 +102,10 @@ class Session:
     error: str | None = None
     # Sessão por endereço que lê a legenda WebVTT do HLS em vez do áudio.
     captions: bool = False
+    # Fonte "rtmp": chave que o OBS usa para enviar a transmissão (segredo).
+    stream_key: str | None = None
+    composition: CompositionOptions | None = None
+    compositor: Compositor | None = None
     ingest_connected: bool = False
     subscribers: set[asyncio.Queue[dict[str, Any]]] = field(default_factory=set)
     task: asyncio.Task[None] | None = None
@@ -119,9 +124,20 @@ class Session:
             "error": self.error,
             "subscribers": len(self.subscribers),
             "captions": self.captions,
+            "composition": self.composition_info(),
             "feedbackKey": feedback_key(self.id),
             "createdAt": round(self.created_at),
             "latency": self.latency(),
+        }
+
+    def composition_info(self) -> dict[str, Any] | None:
+        if not self.composition:
+            return None
+        compositor = self.compositor
+        return {
+            **self.composition.public(),
+            "state": compositor.state if compositor else "starting",
+            "frames": compositor.frames if compositor else 0,
         }
 
     def latency(self) -> dict[str, float] | None:
@@ -145,6 +161,19 @@ class Session:
 Runner = Callable[[Callable[[], list[protocol.Event]]], Awaitable[list[protocol.Event]]]
 
 
+@dataclass(frozen=True)
+class ComposerConfig:
+    """O que a composição precisa do servidor: onde a página do overlay está, o
+    pacote de sinais, o Chromium e a porta RTMP. `unavailable` diz por que ela não
+    funciona aqui (None: funciona)."""
+
+    page_base: str = ""
+    signs_url: str = ""
+    chromium: str = ""
+    rtmp_port: int = 1935
+    unavailable: str | None = "composição não configurada"
+
+
 class SessionHub:
     def __init__(
         self,
@@ -154,6 +183,7 @@ class SessionHub:
         options: StreamingOptions | None = None,
         max_sessions: int = 4,
         ffmpeg: str = "ffmpeg",
+        composer: ComposerConfig | None = None,
     ) -> None:
         self._engine = engine
         self._vad = vad
@@ -161,6 +191,7 @@ class SessionHub:
         self._options = options
         self._max_sessions = max_sessions
         self._ffmpeg = ffmpeg
+        self.composer = composer or ComposerConfig()
         self.sessions: dict[str, Session] = {}
 
     def create(
@@ -170,6 +201,7 @@ class SessionHub:
         realtime: bool = False,
         session_id: str | None = None,
         captions: bool = False,
+        composition: CompositionOptions | None = None,
     ) -> Session:
         """Cria uma sessão. Com `session_id` já em uso, apague a antiga antes (`delete`)."""
         self.reap()
@@ -181,17 +213,43 @@ class SessionHub:
             raise SessionError("Limite de sessões simultâneas atingido")
         if source == "url":
             check_stream_url(url or "")
-        elif source not in ("audio", "text"):
-            raise SessionError("Fonte desconhecida: use 'audio', 'url' ou 'text'")
+        elif source not in ("audio", "text", "rtmp"):
+            raise SessionError("Fonte desconhecida: use 'audio', 'url', 'text' ou 'rtmp'")
+        if composition:
+            if source not in ("url", "rtmp"):
+                raise SessionError("A composição precisa de uma fonte 'url' ou 'rtmp'")
+            if self.composer.unavailable:
+                raise SessionError(f"Composição indisponível: {self.composer.unavailable}")
+            try:
+                composition.validate()
+            except CompositionError as error:
+                raise SessionError(str(error)) from error
+            if any(s.composition and s.task for s in self.sessions.values()):
+                raise SessionError("Já há uma composição em andamento neste servidor")
+        if source == "rtmp" and any(s.source == "rtmp" and s.task for s in self.sessions.values()):
+            raise SessionError("Já há uma sessão recebendo RTMP neste servidor")
+        stream_key = secrets.token_urlsafe(12) if source == "rtmp" else None
         session = Session(
             id=session_id or secrets.token_urlsafe(16),
             source=source,
-            url=url if source == "url" else None,
+            url=(
+                url
+                if source == "url"
+                else f"rtmp://0.0.0.0:{self.composer.rtmp_port}/live/{stream_key}"
+                if source == "rtmp"
+                else None
+            ),
             streaming=StreamingSession(self._engine, self._vad, self._options),
-            captions=captions and source == "url",
+            captions=captions and source == "url" and not composition,
+            stream_key=stream_key,
+            composition=composition,
         )
         self.sessions[session.id] = session
-        if source == "url" and session.captions:
+        if composition:
+            session.task = asyncio.create_task(self._compose(session, realtime))
+        elif source == "rtmp":
+            session.task = asyncio.create_task(self._ingest_url(session, False, listen=True))
+        elif source == "url" and session.captions:
             session.task = asyncio.create_task(self._ingest_captions(session, realtime))
         elif source == "url":
             session.task = asyncio.create_task(self._ingest_url(session, realtime))
@@ -345,15 +403,45 @@ class SessionHub:
         finally:
             session.task = None
 
-    async def _ingest_url(self, session: Session, realtime: bool) -> None:
+    async def _compose(self, session: Session, realtime: bool) -> None:
+        assert session.composition
+        config = self.composer
+        compositor = Compositor(
+            source=session.url or "",
+            realtime=realtime,
+            options=session.composition,
+            listen=session.source == "rtmp",
+            page_url=window_page_url(
+                config.page_base, session.id, session.composition, config.signs_url
+            ),
+            feed=lambda pcm: self.feed(session, pcm),
+            media_start=lambda: session.clock.wall(0.0),
+            ffmpeg=self._ffmpeg,
+            chromium=config.chromium,
+            protocols=FFMPEG_PROTOCOLS,
+        )
+        session.compositor = compositor
+        try:
+            await compositor.run()
+            await self.flush(session)
+            self._set_state(session, "ended")
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:  # ffmpeg, Chromium, rede
+            log.warning("Composição da sessão %s: %s", session.id, error)
+            self._set_state(session, "error", f"Composição: {error}")
+        finally:
+            session.task = None
+
+    async def _ingest_url(self, session: Session, realtime: bool, listen: bool = False) -> None:
         args = [
             self._ffmpeg,
             "-nostdin",
             "-hide_banner",
             "-loglevel",
             "error",
-            "-protocol_whitelist",
-            FFMPEG_PROTOCOLS,
+            # Fonte "rtmp": espera o OBS enviar, em vez de abrir um endereço.
+            *(["-listen", "1"] if listen else ["-protocol_whitelist", FFMPEG_PROTOCOLS]),
             # Vídeo gravado: lê na velocidade real, como se fosse ao vivo.
             *(["-re"] if realtime else []),
             "-i",

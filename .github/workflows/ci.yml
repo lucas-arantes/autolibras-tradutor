@@ -45,6 +45,8 @@ jobs:
       # A imagem leva o app web junto, então o contexto é a raiz do repositório.
       - run: docker build -t autolibras .
         working-directory: .
+      # A composição precisa de ffmpeg, Playwright, Chromium e WebGL dentro da imagem.
+      - run: docker run --rm autolibras python -m autolibras_stt.composer --check
       # As combinações de docker-compose descritas nos guias.
       - run: |
           docker compose -f docker-compose.yml config -q

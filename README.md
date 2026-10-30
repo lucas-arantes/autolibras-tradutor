@@ -41,6 +41,8 @@ docker compose up -d
 
 No Estúdio (http://localhost:8000/studio.html), você escolhe a fonte: um dispositivo de áudio do computador (microfone, mesa de som, cabo virtual), o endereço da transmissão (RTMP, SRT ou HLS), que o servidor lê com o ffmpeg, ou texto. Do endereço, o servidor pode usar a legenda da transmissão (WebVTT ou closed caption) em vez de reconhecer a fala. O texto pode ser digitado ou enviado por outro programa pela API. O Estúdio mostra o endereço do overlay, que entra no OBS como fonte de navegador. O endereço não muda de uma live para outra. O passo a passo está em [Libras na sua live com o OBS](docs/transmissoes-obs.md). Para usar GPU ou um servidor na internet, com custos de referência, veja [Onde rodar o AutoLibras](docs/hospedagem.md).
 
+O servidor também pode devolver a live já com a janela de Libras embutida: o OBS transmite para o AutoLibras, que junta a janela ao vídeo, com o atraso que põe o sinal junto com a fala, e envia o resultado para o YouTube, a Twitch ou outro servidor RTMP ou SRT.
+
 O Estúdio também dá um link para o público dizer se entendeu a tradução, e mostra as respostas durante a live. O botão Libras dos players de vídeo pode mandar a mesma avaliação.
 
 ![Uma transmissão de exemplo com o avatar no canto e a frase embaixo dele.](docs/imagens/captura-overlay-obs.png)

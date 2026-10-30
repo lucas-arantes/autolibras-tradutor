@@ -39,7 +39,7 @@ As imagens em `ghcr.io/lucas-arantes/autolibras` juntam o código deste reposit�
 
 - `latest` parte de `python:3.12-slim` (Debian) e inclui o FFmpeg e outros pacotes do Debian, cada um com a sua licença (várias GPL e LGPL). O código-fonte desses pacotes está nos repositórios do Debian (`apt-get source <pacote>`).
 - `gpu` parte de `nvidia/cuda` (Ubuntu) e inclui o CUDA e o cuDNN, distribuídos sob os termos de licença da NVIDIA, além do FFmpeg e de outros pacotes do Ubuntu, cujo código-fonte está nos repositórios do Ubuntu.
-- As duas incluem as dependências Python da tabela acima, instaladas pelo pip.
+- As duas incluem as dependências Python da tabela acima, instaladas pelo pip, e o [Playwright](https://playwright.dev/python/) (Apache-2.0) com o Chromium que ele baixa (BSD-3-Clause e outras licenças livres do projeto Chromium), usados para desenhar a janela de Libras na composição.
 
 O `docker-compose.hosted.yml` usa a imagem oficial do [Caddy](https://caddyserver.com/) (Apache-2.0), baixada direto do Docker Hub; ela não é redistribuída pelo projeto.
 

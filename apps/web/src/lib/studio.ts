@@ -2,7 +2,20 @@
 import type { VLibrasAvatar } from "@autolibras/vlibras";
 import { SIGN_PACK_URL } from "./avatar";
 
-export type StudioSource = "audio" | "url" | "text";
+export type StudioSource = "audio" | "url" | "text" | "rtmp";
+
+/** Composição no servidor: a transmissão sai com a janela de Libras embutida. */
+export interface CompositionSettings {
+  enabled: boolean;
+  /** Para onde vai a transmissão pronta (rtmp://, rtmps:// ou srt://, com a chave). */
+  output: string;
+  delay: number;
+  position: "right" | "left";
+  size: number;
+  background: "painel" | "recorte";
+  caption: boolean;
+  resolution: string;
+}
 /** Avatar do overlay: o próprio do AutoLibras ou um personagem do VLibras. */
 export type StudioAvatar = "propio" | VLibrasAvatar;
 
@@ -25,6 +38,7 @@ export interface StudioSettings {
   /** Pacote de sinais do avatar próprio. Vazio: o do servidor, se houver, ou o do build. */
   signsUrl: string;
   caption: boolean;
+  composition: CompositionSettings;
 }
 
 export interface ServerHealth {
@@ -34,6 +48,9 @@ export interface ServerHealth {
   web: boolean;
   /** O servidor serve um pacote de sinais do avatar próprio em `/signs/`. */
   signs: boolean;
+  /** O servidor consegue compor a janela de Libras no vídeo; se não, o motivo. */
+  composition?: boolean;
+  compositionError?: string | null;
 }
 
 export interface SessionInfo {
@@ -46,6 +63,9 @@ export interface SessionInfo {
   latency: { p50: number; p95: number; recommendedDelay: number; count: number } | null;
   /** Chave do formulário público de retorno desta sessão. */
   feedbackKey: string;
+  composition?: { state: string; frames: number; output: string } | null;
+  /** Onde o OBS envia (só na resposta de criação e na lista, que pedem token). */
+  rtmp?: { server: string; key: string };
 }
 
 export interface FeedbackItem {
@@ -96,6 +116,16 @@ export function defaultSettings(origin: string, servedByServer: boolean): Studio
     realtime: false,
     captions: false,
     syncDelay: 0,
+    composition: {
+      enabled: false,
+      output: "",
+      delay: 8,
+      position: "right",
+      size: 0.5,
+      background: "painel",
+      caption: true,
+      resolution: "1280x720",
+    },
     avatar: "propio",
     signsUrl: "",
     caption: false,
@@ -105,7 +135,12 @@ export function defaultSettings(origin: string, servedByServer: boolean): Studio
 export function loadStudioSettings(fallback: StudioSettings): StudioSettings {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<StudioSettings>;
-    return { ...fallback, ...saved };
+    // Configurações salvas por versões antigas não têm todos os campos da composição.
+    return {
+      ...fallback,
+      ...saved,
+      composition: { ...fallback.composition, ...saved.composition },
+    };
   } catch {
     return fallback;
   }
@@ -177,6 +212,15 @@ export function textUrl(server: string, sessionId: string): string {
   return new URL(textPath(sessionId), base(server)).toString();
 }
 
+/** O pedido de composição, se ela estiver ligada e a fonte permitir. */
+export function compositionBody(
+  settings: Pick<StudioSettings, "source" | "composition">,
+): Omit<CompositionSettings, "enabled"> | undefined {
+  const { enabled, ...composition } = settings.composition;
+  if (!enabled || (settings.source !== "url" && settings.source !== "rtmp")) return undefined;
+  return { ...composition, output: composition.output.trim() };
+}
+
 export class SessionApi {
   constructor(
     readonly server: string,
@@ -198,7 +242,11 @@ export class SessionApi {
             captions: settings.captions,
           }
         : { type: settings.source };
-    return this.#request<SessionInfo>("POST", "v1/sessions", { id: settings.sessionId, source });
+    return this.#request<SessionInfo>("POST", "v1/sessions", {
+      id: settings.sessionId,
+      source,
+      composition: compositionBody(settings),
+    });
   }
 
   get(sessionId: string): Promise<SessionInfo> {

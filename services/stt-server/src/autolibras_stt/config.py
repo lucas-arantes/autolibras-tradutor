@@ -41,6 +41,11 @@ class Settings:
     signs_dir: str = ""
     # Pasta para dados que devem sobreviver a reinícios (hoje, o retorno do público).
     data_dir: str = ""
+    # Composição no servidor (janela de Libras embutida no vídeo).
+    rtmp_port: int = 1935
+    chromium: str = ""
+    # Pacote de sinais da janela composta; vazio: o servido em /signs/ ou o publicado.
+    signs_url: str = ""
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -61,6 +66,9 @@ class Settings:
             web_dir=_env("WEB_DIR", ""),
             signs_dir=_env("SIGNS_DIR", ""),
             data_dir=_env("DATA_DIR", ""),
+            rtmp_port=int(_env("RTMP_PORT", "1935")),
+            chromium=_env("CHROMIUM", ""),
+            signs_url=_env("SIGNS_URL", ""),
         )
 
     def origin_allowed(self, origin: str | None, host: str | None = None) -> bool:

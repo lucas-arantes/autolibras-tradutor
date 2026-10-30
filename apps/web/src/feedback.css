@@ -10,6 +10,23 @@
 .feedback h1 {
   font-size: 1.4rem;
 }
+.sign {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+}
+.sign[hidden] {
+  display: none;
+}
+.sign button {
+  justify-self: center;
+}
+.sign canvas {
+  width: min(100%, 280px);
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
 .ratings {
   display: flex;
   flex-wrap: wrap;

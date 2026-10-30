@@ -60,8 +60,12 @@ async function load(): Promise<void> {
     });
     video.append(track);
   }
-  if (/\.m3u8($|\?)/.test(videoUrl) && !video.canPlayType("application/vnd.apple.mpegurl")) {
-    const { default: Hls } = await import("hls.js");
+  const hlsModule = /\.m3u8($|\?)/.test(videoUrl) ? await import("hls.js") : null;
+  // O hls.js vem primeiro sempre que o navegador o suporta: o HLS nativo do Chrome toca
+  // o vídeo mas ignora a faixa de legendas WebVTT. O nativo fica para o Safari do
+  // iPhone, que não tem MediaSource e expõe as legendas como faixas do <video>.
+  if (hlsModule?.default.isSupported()) {
+    const Hls = hlsModule.default;
     const hls = new Hls();
     // Carrega a legenda sem mostrá-la: o avatar a acompanha mesmo escondida.
     hls.subtitleDisplay = false;

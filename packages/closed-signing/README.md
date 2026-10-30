@@ -45,7 +45,7 @@ Com `feedbackUrl`, `createFeedbackButtons()` cria os botões "Entendi" e "Não e
 
 ## Players
 
-O plugin segue as `textTracks` do `<video>`. Ele foi testado com `<video>` e `<track>`. O hls.js, o video.js e o Shaka Player também põem as legendas nas `textTracks` e devem funcionar do mesmo jeito, mas ainda não foram testados. No hls.js, escolha a faixa em português (`hls.subtitleTrack`) e use `hls.subtitleDisplay = false` se a legenda não deve aparecer na tela; o avatar a acompanha mesmo escondida. A página [`assista.html`](../../apps/web/assista.html) do app é um exemplo com hls.js.
+O plugin segue as `textTracks` do `<video>`. Ele foi testado com `<video>` e `<track>` e com o hls.js numa transmissão HLS com legenda WebVTT. O video.js e o Shaka Player também põem as legendas nas `textTracks` e devem funcionar do mesmo jeito, mas ainda não foram testados. O HLS nativo do Chrome toca o vídeo mas ignora a faixa de legendas, então use o hls.js sempre que `Hls.isSupported()`. No hls.js, escolha a faixa em português (`hls.subtitleTrack`) e use `hls.subtitleDisplay = false` se a legenda não deve aparecer na tela; o avatar a acompanha mesmo escondida. A página [`assista.html`](../../apps/web/assista.html) do app é um exemplo com hls.js.
 
 ## Como funciona
 

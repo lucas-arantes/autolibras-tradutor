@@ -173,7 +173,10 @@ export class ThreeVrmStage implements AvatarStage {
     const tan = Math.tan((camera.fov * Math.PI) / 360);
     const { top, bottom } = this.#span;
     const distance = Math.max((top - bottom) / 2 / tan, FRAME_WIDTH / 2 / (tan * camera.aspect));
-    const center = (top + bottom) / 2;
+    // Num canvas alto, a largura dos braços decide a distância e sobra altura. A
+    // sobra vai para baixo do quadril, e não para cima da cabeça, onde só ficaria vazio.
+    const halfHeight = distance * tan;
+    const center = Math.min((top + bottom) / 2, top - halfHeight);
     camera.position.set(0, center + 0.04, distance + 0.1);
     camera.lookAt(0, center, 0);
     camera.updateProjectionMatrix();

@@ -20,6 +20,12 @@ npm run dev
 
 O servidor de transcrição precisa do Python 3.11 ou mais recente. As instruções estão em [`services/stt-server/README.md`](services/stt-server/README.md).
 
+Para testar a imagem Docker com as suas mudanças, monte-a a partir do código:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
 ## Antes de abrir um pull request
 
 Rode as mesmas verificações do CI. No app web:

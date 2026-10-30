@@ -33,6 +33,16 @@ O servidor em `services/stt-server` instala estas dependências pelo pip. O mode
 | NumPy | Processamento do áudio | BSD-3-Clause |
 | [FFmpeg](https://ffmpeg.org/) | Leitura de transmissões RTMP, SRT e HLS nas sessões por endereço. É um programa à parte, que o servidor chama; a imagem Docker o instala do Debian ao ser montada | LGPL-2.1-or-later, com partes GPL no pacote do Debian |
 
+## Imagens Docker publicadas
+
+As imagens em `ghcr.io/lucas-arantes/autolibras` juntam o código deste repositório com software de terceiros instalado na montagem:
+
+- `latest` parte de `python:3.12-slim` (Debian) e inclui o FFmpeg e outros pacotes do Debian, cada um com a sua licença (várias GPL e LGPL). O código-fonte desses pacotes está nos repositórios do Debian (`apt-get source <pacote>`).
+- `gpu` parte de `nvidia/cuda` (Ubuntu) e inclui o CUDA e o cuDNN, distribuídos sob os termos de licença da NVIDIA, além do FFmpeg e de outros pacotes do Ubuntu, cujo código-fonte está nos repositórios do Ubuntu.
+- As duas incluem as dependências Python da tabela acima, instaladas pelo pip.
+
+O `docker-compose.hosted.yml` usa a imagem oficial do [Caddy](https://caddyserver.com/) (Apache-2.0), baixada direto do Docker Hub; ela não é redistribuída pelo projeto.
+
 ## Modelo do avatar próprio
 
 `packages/avatar-three/assets/autolibras.vrm` foi gerado pelos scripts de `packages/avatar-three/tools/avatar` e é distribuído como CC0 (domínio público). Ele só usa assets CC0 do MakeHuman:

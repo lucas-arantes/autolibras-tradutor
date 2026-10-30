@@ -139,6 +139,32 @@ HAND_POINTS = {
 # Distâncias (na escala de cada âncora) em que o contato vale inteiro e em que some.
 CONTACT_RANGES = {"face": (2.2, 3.0), "chest": (0.55, 0.8), "hand": (0.6, 1.2)}
 
+# Expressões não manuais. No rig do VLibras, ossos do rosto movem shape keys por drivers
+# lineares; cada canal do clipe junta as shape keys de um mesmo movimento ("mean" para os
+# pares esquerdo/direito, "max" para alternativas) e vai de 0 a 1. O avatar traduz cada
+# canal para as expressões que tiver (ver FACE_EXPRESSIONS em src/vrm-renderer.ts).
+FACE_CHANNELS = {
+    "browRaise": ("mean", ("LevantaSobrancelhaEsq", "LevantaSobrancelhaDir")),
+    "browOuterUp": ("mean", ("SobrancelhaEsqAberta", "SobrancelhaDirAberta")),
+    "browLower": ("mean", ("BaixaSobrancelhaEsq", "BaixaSobrancelhaDir")),
+    "browFrown": ("max", ("FranzirSobrancelha",)),
+    "browAngry": ("mean", ("SobrancelhaEsqRaiva", "SobrancelhaDirRaiva")),
+    "smile": ("max", ("Sorriso",)),
+    "frown": ("max", ("BaixaCantoBoca", "baixaBocaCanto_esq", "baixaBocaCanto_dir")),
+    "pucker": ("max", ("Bico",)),
+    "lipPress": ("max", ("LabioContraido",)),
+    "upperLip": ("max", ("LabioSuperior",)),
+    "cheekPuff": ("max", ("InflaBochecha", "BochechaInfladaEsq", "BochechaInfladaDir")),
+    "cheekSuck": ("max", ("BochechaContraida",)),
+    # O driver da boca aberta chega a 0,786 com a mandíbula a 20°.
+    "jawOpen": ("max", ("correcaoAbreBoca",), 1 / 0.786),
+}
+FACE_KEYS = {name for spec in FACE_CHANNELS.values() for name in spec[1]}
+# Canais mais fracos que isso no clipe todo não são gravados.
+FACE_MIN_WEIGHT = 0.08
+# Erro máximo (em peso) da redução de quadros-chave dos canais do rosto.
+FACE_TOLERANCE = 0.02
+
 
 def slug(name):
     """Nome de arquivo seguro para URL: mantém [A-Za-z0-9_-] e codifica o resto."""
@@ -176,8 +202,21 @@ def find_action(stem):
     return max(actions, key=score)
 
 
+def find_face_keys():
+    """Shape keys do rosto movidas por drivers (ausentes em arquivos sem rosto animável)."""
+    for obj in bpy.data.objects:
+        keys = obj.data.shape_keys if obj.type == "MESH" else None
+        if keys and keys.animation_data and keys.animation_data.drivers:
+            if FACE_KEYS & {kb.name for kb in keys.key_blocks}:
+                return keys
+    return None
+
+
 def sample_source(arm, action):
-    """Amostra, quadro a quadro, rotação e posição (cabeça/cauda) dos ossos usados."""
+    """Amostra, quadro a quadro, rotação e posição (cabeça/cauda) dos ossos usados.
+
+    Também lê o valor das shape keys do rosto em cada quadro (os drivers já calculados).
+    """
     arm.animation_data_create()
     arm.animation_data.action = action
     if action.slots:
@@ -190,8 +229,13 @@ def sample_source(arm, action):
     start, end = (int(round(x)) for x in action.frame_range)
     world = arm.matrix_world
     frames = []
+    face = []
+    face_keys = find_face_keys()
     for f in range(start, end + 1):
         scene.frame_set(f)
+        if face_keys is not None:
+            evaluated = face_keys.evaluated_get(bpy.context.evaluated_depsgraph_get())
+            face.append({kb.name: kb.value for kb in evaluated.key_blocks if kb.name in FACE_KEYS})
         data = {}
         for name in SOURCE_BONES:
             pb = arm.pose.bones[name]
@@ -208,7 +252,7 @@ def sample_source(arm, action):
         mat = world @ bone.matrix_local
         rest[name] = (mat.to_quaternion().normalized(), world @ bone.head_local, world @ bone.tail_local)
     fps = scene.render.fps / scene.render.fps_base
-    return frames, rest, fps, start
+    return frames, face, rest, fps, start
 
 
 def joint(data, ref):
@@ -368,6 +412,50 @@ def extract_contacts(frames, rest, world_tracks):
     return channels
 
 
+def extract_face(face):
+    """Canais de expressão (0 a 1) quadro a quadro, medidos a partir do primeiro quadro.
+
+    O primeiro quadro é o rosto neutro do sinal: algumas shape keys já começam um pouco
+    ligadas no repouso do rig (o sorriso, por exemplo) e isso não faz parte do sinal.
+    """
+    if not face:
+        return {}
+    channels = {}
+    for channel, spec in FACE_CHANNELS.items():
+        mode, names = spec[0], [n for n in spec[1] if n in face[0]]
+        gain = spec[2] if len(spec) > 2 else 1.0
+        if not names:
+            continue
+        raw = []
+        for values in face:
+            parts = [values[n] for n in names]
+            raw.append(sum(parts) / len(parts) if mode == "mean" else max(parts))
+        track = [min(1.0, max(0.0, (v - raw[0]) * gain)) for v in raw]
+        if max(track) >= FACE_MIN_WEIGHT:
+            channels[channel] = track
+    return channels
+
+
+def reduce_scalar(values, tol):
+    """Índices mínimos para reproduzir a série com interpolação linear e erro <= tol."""
+    n = len(values)
+    if n <= 2:
+        return list(range(n))
+    keep = {0, n - 1}
+    stack = [(0, n - 1)]
+    while stack:
+        a, b = stack.pop()
+        worst, worst_i = 0.0, -1
+        for i in range(a + 1, b):
+            v = values[a] + (values[b] - values[a]) * (i - a) / (b - a)
+            if abs(v - values[i]) > worst:
+                worst, worst_i = abs(v - values[i]), i
+        if worst > tol:
+            keep.add(worst_i)
+            stack += [(a, worst_i), (worst_i, b)]
+    return sorted(keep)
+
+
 def angle_deg(a, b):
     """Ângulo entre duas rotações, ignorando o sinal do quaternion."""
     return math.degrees(2 * math.acos(min(1.0, abs(a.dot(b)))))
@@ -477,11 +565,12 @@ def contact_node_name(channel):
     return "_".join(parts)
 
 
-def write_glb(path, local_tracks, fps, meta, tol_deg, contacts=()):
+def write_glb(path, local_tracks, fps, meta, tol_deg, contacts=(), face=None):
     """Grava o glTF binário: um nó por osso VRM e uma animação de rotações.
 
     Cada contato vira um nó fictício fora do esqueleto: a translação é o deslocamento
-    da mão no referencial da âncora e a escala (x = y = z) é o peso do contato.
+    da mão no referencial da âncora e a escala (x = y = z) é o peso do contato. Cada
+    canal de expressão vira um nó `face_<canal>`, com o peso na escala.
     """
     names = list(VRM_MAP)
     index = {name: i for i, name in enumerate(names)}
@@ -571,12 +660,19 @@ def write_glb(path, local_tracks, fps, meta, tol_deg, contacts=()):
         offsets = [tuple(round(c, 4) for c in o) for o in contact["offsets"]]
         add_vec3_channel(node, times, offsets, "translation")
         add_vec3_channel(node, times, [(round(w, 4),) * 3 for w in contact["weights"]], "scale")
+    for channel, track in (face or {}).items():
+        nodes.append({"name": f"face_{channel}"})
+        node = len(nodes) - 1
+        roots.append(node)
+        keep = reduce_scalar(track, FACE_TOLERANCE)
+        times = [frame_times[i] for i in keep]
+        add_vec3_channel(node, times, [(round(track[i], 3),) * 3 for i in keep], "scale")
 
     gltf = {
         "asset": {
             "version": "2.0",
             "generator": "AutoLibras vlibras_to_vrm.py",
-            "copyright": "VLibras dictionary sources, GPL-3.0-or-later",
+            "copyright": "VLibras dictionary sources (LAViD/UFPB), GPL-3.0-only",
             "extras": meta,
         },
         "scene": 0,
@@ -669,7 +765,7 @@ def convert(path, out_dir, tol_deg):
     bpy.ops.wm.open_mainfile(filepath=path, load_ui=False)
     arm = find_armature()
     action = find_action(stem)
-    frames, rest, fps, start = sample_source(arm, action)
+    frames, face_frames, rest, fps, start = sample_source(arm, action)
     arm_len = (rest["BnBraco.L"][1] - rest["BnMao.L"][1]).length
     world_tracks, local_tracks = retarget(frames, rest)
     on, off = detect_stroke(frames, fps, arm_len)
@@ -690,7 +786,7 @@ def convert(path, out_dir, tol_deg):
         "strokeStart": round(on / fps, 4),
         "strokeEnd": round(off / fps, 4),
         "hands": hands,
-        "license": "GPL-3.0-or-later",
+        "license": "GPL-3.0-only",
     }
     glb = os.path.join(out_dir, f"{name}.glb")
     contacts = extract_contacts(frames, rest, world_tracks)
@@ -703,7 +799,9 @@ def convert(path, out_dir, tol_deg):
         }
         for c in contacts
     ]
-    decoded = write_glb(glb, local_tracks, fps, meta, tol_deg, contacts)
+    face = extract_face(face_frames)
+    meta["face"] = {channel: round(max(track), 3) for channel, track in face.items()}
+    decoded = write_glb(glb, local_tracks, fps, meta, tol_deg, contacts, face)
     meta["quality"] = measure(frames, rest, world_tracks, decoded, arm_len)
     meta["file"] = f"{name}.glb"
     meta["bytes"] = os.path.getsize(glb)

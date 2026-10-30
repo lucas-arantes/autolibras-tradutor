@@ -2,6 +2,8 @@
 import { captureStream, RemoteWhisperRecognizer } from "@autolibras/stt-web";
 import { onDestroy } from "svelte";
 import {
+  type FeedbackList,
+  feedbackPageUrl,
   ingestUrl,
   newSessionId,
   overlayUrl,
@@ -29,6 +31,10 @@ let transcript = $state("");
 let devices = $state<MediaDeviceInfo[]>([]);
 let copied = $state(false);
 let typed = $state("");
+let feedback = $state<FeedbackList | null>(null);
+let feedbackCopied = $state(false);
+// A chave fica guardada depois de parar, para o link continuar valendo na próxima live.
+let feedbackKey = $state("");
 let sentTexts = $state<string[]>([]);
 
 let recognizer: RemoteWhisperRecognizer | undefined;
@@ -79,6 +85,7 @@ async function start(): Promise<void> {
   try {
     health = await api.health();
     session = await api.create($state.snapshot(settings));
+    feedbackKey = session.feedbackKey;
     if (settings.source === "audio") startAudio();
     running = true;
     poll = setInterval(refresh, 3_000);
@@ -120,9 +127,21 @@ function startAudio(): void {
 async function refresh(): Promise<void> {
   try {
     session = await api.get(settings.sessionId);
+    feedbackKey = session.feedbackKey;
+    feedback = await api.feedback(session.feedbackKey);
   } catch {
     // A próxima consulta tenta de novo.
   }
+}
+
+const feedbackLink = $derived(
+  feedbackKey ? feedbackPageUrl(settings.server, feedbackKey, pageBase, health?.web ?? false) : "",
+);
+
+async function copyFeedbackLink(): Promise<void> {
+  await navigator.clipboard.writeText(feedbackLink);
+  feedbackCopied = true;
+  setTimeout(() => (feedbackCopied = false), 2_000);
 }
 
 async function stop(): Promise<void> {
@@ -432,6 +451,42 @@ onDestroy(() => {
     </div>
   </section>
 
+  <section class="card">
+    <h2>4. Retorno do público</h2>
+    {#if feedbackLink}
+      <div class="fields">
+        <p class="muted">
+          Ponha este link no chat ou na descrição da live. Quem assiste diz se entendeu a tradução, e
+          as respostas aparecem aqui.
+        </p>
+        <div class="row">
+          <input type="text" readonly value={feedbackLink} aria-label="Link do formulário de retorno" />
+          <button type="button" class="secondary" onclick={copyFeedbackLink}>
+            {feedbackCopied ? "Copiado" : "Copiar"}
+          </button>
+        </div>
+        {#if feedback}
+          <p>
+            <strong>{feedback.summary.good}</strong> entenderam e
+            <strong>{feedback.summary.bad}</strong> não entenderam.
+          </p>
+          <ul class="feedback-list">
+            {#each feedback.items.filter((item) => item.comment).slice(0, 10) as item (item.time)}
+              <li>
+                <span class="badge" data-status={item.rating === "good" ? "concluído" : "erro"}>
+                  {item.rating === "good" ? "Entendi" : "Não entendi"}
+                </span>
+                {item.comment}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    {:else}
+      <p class="muted">O link para o público avaliar aparece quando a tradução começa.</p>
+    {/if}
+  </section>
+
   <section class="card notice">
     <p>
       O avatar automático complementa, mas não substitui, o intérprete de Libras. Na TV, a lei exige
@@ -503,6 +558,18 @@ onDestroy(() => {
     margin-top: 1rem;
     min-height: 0;
     font-size: 1.1rem;
+  }
+  .feedback-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.4rem;
+  }
+  .feedback-list li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
   }
   .sync {
     display: grid;

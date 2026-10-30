@@ -45,6 +45,60 @@ jobs:
       # A imagem leva o app web junto, então o contexto é a raiz do repositório.
       - run: docker build -t autolibras .
         working-directory: .
+      # As combinações de docker-compose descritas nos guias.
+      - run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.yml -f docker-compose.build.yml config -q
+          docker compose -f docker-compose.yml -f docker-compose.gpu.yml config -q
+          AUTOLIBRAS_DOMAIN=libras.exemplo.org AUTOLIBRAS_TOKEN=x \
+            docker compose -f docker-compose.yml -f docker-compose.hosted.yml -f docker-compose.gpu.yml config -q
+        working-directory: .
+
+  # Publica a imagem Docker pronta (Intel/AMD e ARM) no GitHub Container Registry,
+  # para quem transmite usar só o docker-compose.yml, sem baixar o código.
+  image:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, stt-server]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/autolibras
+          tags: |
+            type=raw,value=latest
+            type=sha
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Variante com CUDA, só para x86: as GPUs NVIDIA de servidor são dessa arquitetura.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.gpu
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/autolibras:gpu
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=gpu
+          cache-to: type=gha,mode=max,scope=gpu
 
   # Publica o app no GitHub Pages depois que as verificações passam no main.
   deploy:

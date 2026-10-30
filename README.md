@@ -24,15 +24,17 @@ A [extensão do Chrome](apps/extension/README.md) faz o mesmo com o áudio de um
 
 ## Transmissões ao vivo
 
-Com o Docker, um comando sobe o servidor de transcrição junto com o Estúdio e o overlay:
+Com o Docker e o arquivo [`docker-compose.yml`](docker-compose.yml) numa pasta, um comando baixa a imagem pronta e sobe o servidor de transcrição junto com o Estúdio e o overlay:
 
 ```bash
 docker compose up -d
 ```
 
-No Estúdio (http://localhost:8000/studio.html), você escolhe a fonte: um dispositivo de áudio do computador (microfone, mesa de som, cabo virtual), o endereço da transmissão (RTMP, SRT ou HLS), que o servidor lê com o ffmpeg, ou texto. Do endereço, o servidor pode usar a legenda da transmissão (WebVTT ou closed caption) em vez de reconhecer a fala. O texto pode ser digitado ou enviado por outro programa pela API. O Estúdio mostra o endereço do overlay, que entra no OBS como fonte de navegador. O endereço não muda de uma live para outra. O passo a passo está em [Libras na sua live com o OBS](docs/transmissoes-obs.md).
+No Estúdio (http://localhost:8000/studio.html), você escolhe a fonte: um dispositivo de áudio do computador (microfone, mesa de som, cabo virtual), o endereço da transmissão (RTMP, SRT ou HLS), que o servidor lê com o ffmpeg, ou texto. Do endereço, o servidor pode usar a legenda da transmissão (WebVTT ou closed caption) em vez de reconhecer a fala. O texto pode ser digitado ou enviado por outro programa pela API. O Estúdio mostra o endereço do overlay, que entra no OBS como fonte de navegador. O endereço não muda de uma live para outra. O passo a passo está em [Libras na sua live com o OBS](docs/transmissoes-obs.md). Para usar GPU ou um servidor na internet, com custos de referência, veja [Onde rodar o AutoLibras](docs/hospedagem.md).
 
-O overlay usa o avatar próprio, com fundo transparente e o tradutor de regras local, sem depender dos serviços do VLibras. Ele precisa de um pacote de sinais, que o servidor serve a partir da pasta `sinais`. O avatar do VLibras também pode ser escolhido, mas os termos de uso do VLibras não autorizam tradução automática em produções audiovisuais, então ele fica para testes.
+O Estúdio também dá um link para o público dizer se entendeu a tradução, e mostra as respostas durante a live. O botão Libras dos players de vídeo pode mandar a mesma avaliação.
+
+O overlay usa o avatar próprio, com fundo transparente e o tradutor de regras local, sem depender dos serviços do VLibras. Os sinais vêm do [pacote publicado](https://github.com/lucas-arantes/autolibras-sinais), ou de uma pasta local, para quem não quer depender da internet. O avatar do VLibras também pode ser escolhido, mas os termos de uso do VLibras não autorizam tradução automática em produções audiovisuais, então ele fica para testes.
 
 
 ## Libras sob demanda em vídeos

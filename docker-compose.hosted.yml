@@ -1,0 +1,25 @@
+# Servidor na internet, com HTTPS automático (Caddy + Let's Encrypt). O domínio
+# precisa apontar para este servidor, com as portas 80 e 443 abertas:
+#   AUTOLIBRAS_DOMAIN=libras.exemplo.org AUTOLIBRAS_TOKEN=uma-senha-longa \
+#     docker compose -f docker-compose.yml -f docker-compose.hosted.yml up -d
+# Com GPU, acrescente -f docker-compose.gpu.yml.
+services:
+  autolibras:
+    environment:
+      # Na internet, a senha é obrigatória.
+      AUTOLIBRAS_TOKEN: ${AUTOLIBRAS_TOKEN:?defina AUTOLIBRAS_TOKEN}
+
+  https:
+    image: caddy:2
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${AUTOLIBRAS_DOMAIN:?defina AUTOLIBRAS_DOMAIN} --to autolibras:8000
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy:/data
+    depends_on:
+      - autolibras
+
+volumes:
+  caddy:

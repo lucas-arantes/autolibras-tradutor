@@ -1,0 +1,6 @@
+# Monta a imagem a partir do código em vez de baixá-la pronta:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  autolibras:
+    build: .
+    image: autolibras

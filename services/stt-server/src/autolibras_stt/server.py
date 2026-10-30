@@ -21,6 +21,7 @@ from starlette.websockets import WebSocketDisconnect, WebSocketState
 from . import protocol
 from .config import Settings
 from .engine import Engine
+from .feedback import Feedback, FeedbackStore, RateLimiter
 from .sessions import Session, SessionError, SessionHub
 from .streaming import StreamingOptions, StreamingSession
 from .vad import Vad
@@ -69,6 +70,8 @@ def create_app(
             return await asyncio.to_thread(step)
 
     hub = SessionHub(engine, vad, run, options, settings.max_sessions, ffmpeg)
+    feedback = FeedbackStore(settings.data_dir)
+    feedback_limit = RateLimiter(per_minute=10)
     app.state.hub = hub
 
     # O Estúdio pode ser aberto de outra origem (o site publicado) e chama a API REST.
@@ -165,6 +168,53 @@ def create_app(
         if not session:
             raise HTTPException(status_code=404, detail="Sessão não encontrada")
         return session
+
+    # Retorno do público --------------------------------------------------------
+
+    @app.post("/v1/feedback", status_code=204)
+    async def post_feedback(request: Request) -> Response:
+        """Sem token: vem de quem assiste. Aceita o corpo como texto (navigator.sendBeacon),
+        para não precisar de CORS quando o player está em outro site."""
+        client = request.client.host if request.client else "?"
+        if not feedback_limit.allow(client):
+            raise HTTPException(status_code=429, detail="Muitos envios; tente daqui a pouco")
+        body = await request.body()
+        if len(body) > 8_192:
+            raise HTTPException(status_code=413, detail="Retorno grande demais")
+        try:
+            data = json.loads(body or b"{}")
+        except json.JSONDecodeError as error:
+            raise HTTPException(status_code=400, detail="JSON inválido") from error
+        rating = data.get("rating") if isinstance(data, dict) else None
+        if rating not in ("good", "bad"):
+            raise HTTPException(status_code=400, detail='Use "rating": "good" ou "bad"')
+
+        def text(name: str, limit: int) -> str:
+            value = data.get(name)
+            return " ".join(value.split())[:limit] if isinstance(value, str) else ""
+
+        feedback.add(
+            Feedback(
+                time=time.time(),
+                rating=rating,
+                session=text("key", 32) or None,
+                comment=text("comment", 1_000),
+                sentence=text("sentence", 500),
+                source=text("source", 20) or "form",
+                page=text("page", 300),
+            )
+        )
+        return Response(status_code=204)
+
+    @app.get("/v1/feedback")
+    async def list_feedback(request: Request, key: str | None = None) -> dict[str, Any]:
+        require_token(request)
+        return {
+            "summary": feedback.summary(key),
+            "items": [item.to_json() for item in feedback.list(key)],
+        }
+
+    # Sessões de transmissão (rotas) ---------------------------------------------
 
     @app.post("/v1/sessions", status_code=201)
     async def create_session(body: SessionRequest, request: Request) -> dict[str, Any]:

@@ -1,0 +1,49 @@
+# AutoLibras com GPU NVIDIA (CUDA 12 + cuDNN 9): os modelos maiores, como o
+# large-v3-turbo, acompanham a fala. Precisa do NVIDIA Container Toolkit no
+# computador. Veja docs/hospedagem.md.
+
+FROM --platform=$BUILDPLATFORM node:22-slim AS web
+ARG VITE_SIGN_PACK_URL=https://lucas-arantes.github.io/autolibras-sinais/BR/
+WORKDIR /src
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages ./packages
+COPY apps ./apps
+RUN npm ci --ignore-scripts --no-audit --no-fund \
+    && VITE_SIGN_PACK_URL="$VITE_SIGN_PACK_URL" npm run build -w @autolibras/web
+
+FROM nvidia/cuda:12.9.2-cudnn-runtime-ubuntu24.04
+LABEL org.opencontainers.image.source="https://github.com/lucas-arantes/autolibras-tradutor" \
+      org.opencontainers.image.description="AutoLibras com GPU NVIDIA: transcrição ao vivo, Estúdio e overlay do OBS" \
+      org.opencontainers.image.licenses="MIT"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
+    HF_HOME=/models \
+    AUTOLIBRAS_HOST=0.0.0.0 \
+    AUTOLIBRAS_PORT=8000 \
+    AUTOLIBRAS_DEVICE=cuda \
+    AUTOLIBRAS_MODEL=large-v3-turbo \
+    AUTOLIBRAS_WEB_DIR=/app/web
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-venv ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY services/stt-server/pyproject.toml ./
+COPY services/stt-server/src ./src
+RUN python3 -m venv /opt/venv \
+    && pip install --no-cache-dir . \
+    && useradd --create-home app \
+    && mkdir -p /models /data \
+    && chown app /models /data
+COPY --from=web /src/apps/web/dist ./web
+
+USER app
+VOLUME /models /data
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=180s \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
+CMD ["autolibras-stt"]

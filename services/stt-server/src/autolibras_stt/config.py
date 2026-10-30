@@ -39,6 +39,8 @@ class Settings:
     web_dir: str = ""
     # Pacote de sinais do avatar próprio (pasta com manifest.json), servido em /signs/.
     signs_dir: str = ""
+    # Pasta para dados que devem sobreviver a reinícios (hoje, o retorno do público).
+    data_dir: str = ""
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -58,6 +60,7 @@ class Settings:
             token=_env("TOKEN", ""),
             web_dir=_env("WEB_DIR", ""),
             signs_dir=_env("SIGNS_DIR", ""),
+            data_dir=_env("DATA_DIR", ""),
         )
 
     def origin_allowed(self, origin: str | None, host: str | None = None) -> bool:

@@ -12,19 +12,20 @@ Este guia põe o avatar do AutoLibras numa transmissão feita com o OBS Studio. 
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) no Windows ou no macOS. No Linux, o Docker Engine com o plugin `compose`.
 - [OBS Studio](https://obsproject.com/) 28 ou mais recente.
-- O pacote de sinais do avatar próprio, uma pasta com um `manifest.json` e um arquivo por sinal. Os sinais são convertidos do dicionário aberto do VLibras (GPL-3.0) e ficam fora deste repositório. Ainda não há um pacote publicado: para montar o seu, siga [o README do avatar](../packages/avatar-three/README.md#pacote-de-sinais-gpl-30-fora-deste-repositório), que pede o Blender.
-- Internet, na primeira vez, para a lista de sinais que o tradutor local baixa do VLibras.
+- Internet: o overlay baixa os sinais do avatar do [pacote publicado](https://github.com/lucas-arantes/autolibras-sinais) (convertido do dicionário aberto do VLibras, GPL-3.0), só os que aparecem na live, e o tradutor local baixa uma vez a lista de sinais do VLibras. Para rodar sem internet, veja [Pacote de sinais local](#pacote-de-sinais-local).
 - Espaço em disco para a imagem e para o modelo de reconhecimento de fala (o `small` tem cerca de 480 MB).
 
 ## 1. Suba o servidor
 
-Baixe o projeto (pelo botão **Code → Download ZIP** no GitHub ou com o `git`). Ponha o pacote de sinais numa pasta `sinais` dentro dele, com o `manifest.json` direto em `sinais/manifest.json`. Se o pacote estiver em outro lugar, indique o caminho em `AUTOLIBRAS_SIGNS`. Depois, na pasta do projeto, rode:
+Crie uma pasta, salve nela o arquivo [`docker-compose.yml`](https://raw.githubusercontent.com/lucas-arantes/autolibras-tradutor/main/docker-compose.yml) e, nessa pasta, rode:
 
 ```bash
 docker compose up -d
 ```
 
-Na primeira vez, o Docker monta a imagem e o servidor baixa o modelo Whisper, o que leva alguns minutos. Depois disso, ele sobe em segundos e volta sozinho quando o computador reinicia. Para atualizar, baixe a versão nova do projeto e rode `docker compose up -d --build`.
+Na primeira vez, o Docker baixa a imagem pronta e o servidor baixa o modelo Whisper, o que leva alguns minutos. Depois disso, ele sobe em segundos e volta sozinho quando o computador reinicia. Para atualizar, rode `docker compose pull` e `docker compose up -d`.
+
+Para montar a imagem a partir do código, na raiz do repositório, use `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`. Para usar uma GPU NVIDIA ou um servidor na internet, veja [Onde rodar o AutoLibras](hospedagem.md).
 
 Para conferir, abra <http://localhost:8000/health>. Deve aparecer `"status":"ok"`.
 
@@ -67,13 +68,15 @@ O OBS sozinho não tem um jeito simples de atrasar o vídeo e o áudio de uma ce
 
 ## Problemas comuns
 
-**O overlay não mostra nada.** Acrescente `&status=1` ao fim do endereço do overlay, na fonte do OBS, para ver o estado da conexão. "A sessão ainda não começou" quer dizer que falta clicar em **Iniciar tradução** no Estúdio. "Pacote de sinais não configurado" quer dizer que o servidor não achou `sinais/manifest.json`: confira a pasta e rode `docker compose up -d` de novo.
+**O overlay não mostra nada.** Acrescente `&status=1` ao fim do endereço do overlay, na fonte do OBS, para ver o estado da conexão. "A sessão ainda não começou" quer dizer que falta clicar em **Iniciar tradução** no Estúdio. Um erro ao carregar o avatar costuma ser falta de internet para baixar os sinais.
 
 **Uma palavra sai soletrada.** O sinal dela não está no pacote, então o avatar faz a datilologia. O dicionário inteiro do VLibras tem cerca de 23 mil sinais; um pacote menor soletra mais palavras.
 
 **O avatar fica muito atrás da fala.** O computador não está dando conta do modelo. Use um modelo menor: pare o servidor e suba de novo com `AUTOLIBRAS_MODEL=base docker compose up -d`. Fechar programas pesados também ajuda.
 
-**O Estúdio e o OBS estão em computadores diferentes.** No `docker-compose.yml`, troque `"127.0.0.1:8000:8000"` por `"8000:8000"` e defina uma senha com `AUTOLIBRAS_TOKEN=uma-senha-longa docker compose up -d`. Abra o Estúdio pelo endereço do computador do servidor, como `http://192.168.0.10:8000/studio.html`, e digite a senha no campo que aparece. O overlay não pede senha: o id no endereço já funciona como chave.
+**O OBS está em outro computador.** No `docker-compose.yml`, troque `"127.0.0.1:8000:8000"` por `"8000:8000"` e defina uma senha com `AUTOLIBRAS_TOKEN=uma-senha-longa docker compose up -d`. No OBS, use o endereço do computador do servidor no overlay, como `http://192.168.0.10:8000/broadcast.html?...`. O overlay não pede senha: o id no endereço já funciona como chave. O Estúdio que capta o áudio deve ficar aberto no próprio computador do servidor, em `localhost`: o navegador só libera o microfone em `localhost` ou em páginas com HTTPS. As fontes de endereço e de texto funcionam de qualquer computador da rede.
+
+**Pacote de sinais local.** Para não depender da internet, ou para usar outra versão do pacote, baixe o [pacote de sinais](https://github.com/lucas-arantes/autolibras-sinais), ponha-o numa pasta `sinais` ao lado do `docker-compose.yml`, com o `manifest.json` direto em `sinais/manifest.json`, descomente a linha `./sinais:/signs:ro` no arquivo e rode `docker compose up -d` de novo. O Estúdio passa a usar esse pacote.
 
 **O endereço do overlay vazou.** Clique em **Gerar outro endereço** no Estúdio e cole o novo no OBS.
 

@@ -36,8 +36,12 @@ O avatar começa desligado. `enable()`, `disable()` e `toggle()` ligam e desliga
 | `track` | a legenda em português, ou a primeira | Faixa de legenda a seguir |
 | `translator` | regras locais | Tradutor de português para glosa. O padrão não envia texto a servidores |
 | `vocabulary` | `true` | Baixa uma vez a lista de sinais do VLibras, para as regras reconhecerem mais palavras |
+| `feedbackUrl` | nenhum | Endereço que recebe o retorno do público, como o `/v1/feedback` de um servidor do AutoLibras |
+| `feedbackKey` | vazio | Chave enviada com o retorno, para separar vídeos ou canais |
 
 Eventos (`libras.on(...)`): `toggle` (ligou ou desligou), `sentence` (frase que entrou na fila) e `error`.
+
+Com `feedbackUrl`, `createFeedbackButtons()` cria os botões "Entendi" e "Não entendi". Cada clique envia a avaliação, a chave, a página e a última frase sinalizada com `navigator.sendBeacon`, que não precisa de CORS.
 
 ## Players
 

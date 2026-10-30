@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -348,3 +349,39 @@ def test_le_o_closed_caption_embutido_no_video(tmp_path: Path) -> None:
         assert all("inaudible" not in text and ">>" not in text for text in finals)
     finally:
         server.shutdown()
+
+
+def test_retorno_do_publico(tmp_path: Path) -> None:
+    data = tmp_path / "dados"
+    with make_client(tmp_path, token="segredo", data_dir=str(data)) as client:
+        headers = {"Authorization": "Bearer segredo"}
+        created = client.post("/v1/sessions", json={"source": {"type": "audio"}}, headers=headers)
+        key = created.json()["feedbackKey"]
+        assert len(key) == 16 and key not in created.json()["id"]
+        # Sem token, como texto (navigator.sendBeacon).
+        sent = client.post(
+            "/v1/feedback",
+            content=json.dumps({"rating": "bad", "key": key, "comment": "  rápido   demais "}),
+            headers={"Content-Type": "text/plain"},
+        )
+        assert sent.status_code == 204
+        client.post("/v1/feedback", json={"rating": "good", "key": key, "source": "player"})
+        client.post("/v1/feedback", json={"rating": "good"})
+        assert client.post("/v1/feedback", json={"rating": "talvez"}).status_code == 400
+        assert client.get(f"/v1/feedback?key={key}").status_code == 401
+        listed = client.get(f"/v1/feedback?key={key}", headers=headers).json()
+        assert listed["summary"] == {"good": 1, "bad": 1}
+        assert listed["items"][1]["comment"] == "rápido demais"
+    # Os retornos sobrevivem ao reinício.
+    with make_client(tmp_path, token="segredo", data_dir=str(data)) as client:
+        listed = client.get("/v1/feedback", headers={"Authorization": "Bearer segredo"}).json()
+        assert listed["summary"] == {"good": 2, "bad": 1}
+
+
+def test_limita_envios_de_retorno_por_endereco(tmp_path: Path) -> None:
+    with make_client(tmp_path) as client:
+        codes = [
+            client.post("/v1/feedback", json={"rating": "good"}).status_code for _ in range(12)
+        ]
+        assert codes[:10] == [204] * 10
+        assert codes[10:] == [429, 429]

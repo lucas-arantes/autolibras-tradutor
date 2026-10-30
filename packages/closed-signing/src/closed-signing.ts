@@ -22,6 +22,14 @@ export interface ClosedSigningOptions {
    * (padrão: sim). Só vale para o tradutor padrão.
    */
   vocabulary?: boolean;
+  /**
+   * Endereço que recebe o retorno do público (`POST` com JSON, como o
+   * `/v1/feedback` do servidor do AutoLibras). Sem ele, `createFeedbackButtons`
+   * não envia nada.
+   */
+  feedbackUrl?: string;
+  /** Chave enviada junto com o retorno, para separar vídeos ou canais. */
+  feedbackKey?: string;
   /** Cria o avatar; padrão: o avatar VRM do AutoLibras com fundo transparente. */
   createRenderer?: (canvas: HTMLCanvasElement) => Promise<AvatarRenderer>;
 }
@@ -69,6 +77,7 @@ export class ClosedSigning extends Emitter<ClosedSigningEvents> {
   #renderer?: AvatarRenderer;
   #starting?: Promise<void>;
   #enabled = false;
+  #lastSentence = "";
   readonly #onSeeking = () => this.#restart();
   readonly #onTracks = () => {
     if (this.#enabled && !this.#follower.track) this.#follower.follow(this.#pickTrack());
@@ -79,6 +88,7 @@ export class ClosedSigning extends Emitter<ClosedSigningEvents> {
     this.video = video;
     this.#options = options;
     this.#follower = new CueFollower((sentence) => {
+      this.#lastSentence = sentence;
       this.emit("sentence", sentence);
       this.#pipeline?.submitText(sentence);
     });
@@ -162,6 +172,52 @@ export class ClosedSigning extends Emitter<ClosedSigningEvents> {
     button.addEventListener("click", () => void this.toggle());
     this.on("toggle", (on) => button.setAttribute("aria-pressed", String(on)));
     return button;
+  }
+
+  /**
+   * Botões "Entendi" e "Não entendi", para quem assiste avaliar a sinalização.
+   * Cada clique envia a avaliação e a última frase sinalizada para `feedbackUrl`.
+   */
+  createFeedbackButtons(): HTMLElement {
+    const group = document.createElement("span");
+    group.className = "autolibras-closed-signing-feedback";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "Você entendeu a sinalização?");
+    const thanks = document.createElement("span");
+    thanks.setAttribute("role", "status");
+    for (const [rating, label] of [
+      ["good", "Entendi"],
+      ["bad", "Não entendi"],
+    ] as const) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.addEventListener("click", () => {
+        this.sendFeedback(rating);
+        thanks.textContent = "Obrigado!";
+      });
+      group.append(button);
+    }
+    group.append(thanks);
+    return group;
+  }
+
+  /** Envia uma avaliação para `feedbackUrl`. Devolve falso se não houver para onde enviar. */
+  sendFeedback(rating: "good" | "bad", comment = ""): boolean {
+    const { feedbackUrl, feedbackKey = "" } = this.#options;
+    if (!feedbackUrl) return false;
+    const body = JSON.stringify({
+      rating,
+      comment,
+      key: feedbackKey,
+      sentence: this.#lastSentence,
+      source: "player",
+      page: location.href,
+    });
+    // `sendBeacon` manda como texto e não precisa de CORS: o player pode estar em outro site.
+    if (navigator.sendBeacon?.(feedbackUrl, body)) return true;
+    void fetch(feedbackUrl, { method: "POST", body, mode: "no-cors", keepalive: true });
+    return true;
   }
 
   destroy(): void {

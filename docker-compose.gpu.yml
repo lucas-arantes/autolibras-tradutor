@@ -1,0 +1,15 @@
+# Usa a GPU NVIDIA e um modelo maior. Precisa do NVIDIA Container Toolkit:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+services:
+  autolibras:
+    image: ghcr.io/lucas-arantes/autolibras:gpu
+    environment:
+      AUTOLIBRAS_DEVICE: cuda
+      AUTOLIBRAS_MODEL: ${AUTOLIBRAS_MODEL:-large-v3-turbo}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

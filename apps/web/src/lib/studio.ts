@@ -44,6 +44,34 @@ export interface SessionInfo {
   subscribers: number;
   /** Segundos do começo da fala até o final sair do servidor, nas últimas frases. */
   latency: { p50: number; p95: number; recommendedDelay: number; count: number } | null;
+  /** Chave do formulário público de retorno desta sessão. */
+  feedbackKey: string;
+}
+
+export interface FeedbackItem {
+  time: number;
+  rating: "good" | "bad";
+  comment: string;
+  sentence: string;
+  source: string;
+}
+
+export interface FeedbackList {
+  summary: { good: number; bad: number };
+  items: FeedbackItem[];
+}
+
+/** Página pública em que o público diz se entendeu (para pôr no chat ou na descrição). */
+export function feedbackPageUrl(
+  server: string,
+  key: string,
+  pageBase: string,
+  servedByServer: boolean,
+): string {
+  const url = new URL("feedback.html", servedByServer ? base(server) : pageBase);
+  url.searchParams.set("f", key);
+  if (!servedByServer) url.searchParams.set("server", server);
+  return url.toString();
 }
 
 const KEY = "autolibras:studio";
@@ -180,6 +208,10 @@ export class SessionApi {
   /** Envia um texto pronto para a sessão: `final` vai para o avatar; senão, só a legenda. */
   async text(sessionId: string, text: string, final = true): Promise<void> {
     await this.#request<unknown>("POST", textPath(sessionId), { text, final });
+  }
+
+  feedback(key: string): Promise<FeedbackList> {
+    return this.#request<FeedbackList>("GET", `v1/feedback?key=${encodeURIComponent(key)}`);
   }
 
   async delete(sessionId: string): Promise<void> {

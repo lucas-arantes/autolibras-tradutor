@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 from . import protocol
 from .captions import CaptionError, follow_embedded_captions, follow_hls_captions
 from .engine import Engine
+from .feedback import feedback_key
 from .streaming import StreamingOptions, StreamingSession
 from .vad import Vad
 
@@ -118,6 +119,7 @@ class Session:
             "error": self.error,
             "subscribers": len(self.subscribers),
             "captions": self.captions,
+            "feedbackKey": feedback_key(self.id),
             "createdAt": round(self.created_at),
             "latency": self.latency(),
         }

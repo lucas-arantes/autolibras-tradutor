@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultSettings,
+  feedbackPageUrl,
   ingestUrl,
   newSessionId,
   overlayUrl,
@@ -119,5 +120,14 @@ describe("Estúdio", () => {
     ]);
     expect(urls[2]).toBe(textUrl("http://srv.test", "abc"));
     expect(urls[2]).toBe("http://srv.test/v1/sessions/abc/text");
+  });
+
+  it("monta o link do formulário de retorno", () => {
+    expect(feedbackPageUrl("http://pc.local:8000", "abc123", "https://site.test/app/", true)).toBe(
+      "http://pc.local:8000/feedback.html?f=abc123",
+    );
+    expect(
+      feedbackPageUrl("http://localhost:8000", "abc123", "https://site.test/app/", false),
+    ).toBe("https://site.test/app/feedback.html?f=abc123&server=http%3A%2F%2Flocalhost%3A8000");
   });
 });

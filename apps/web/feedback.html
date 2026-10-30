@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Conte se você entendeu a tradução automática em Libras." />
+    <meta name="theme-color" content="#0b5cad" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <title>AutoLibras · avalie a tradução</title>
+  </head>
+  <body>
+    <main class="feedback">
+      <form id="form" class="card">
+        <h1>Você entendeu a tradução em Libras?</h1>
+        <p class="muted">
+          O avatar desta transmissão é automático. A sua resposta ajuda a melhorar a tradução.
+        </p>
+        <fieldset class="ratings">
+          <legend class="visually-hidden">Resposta</legend>
+          <label class="rating"><input type="radio" name="rating" value="good" required /> Entendi</label>
+          <label class="rating"><input type="radio" name="rating" value="bad" /> Não entendi</label>
+        </fieldset>
+        <label class="field">
+          <span>O que pode melhorar? (opcional)</span>
+          <textarea name="comment" rows="4" maxlength="1000"></textarea>
+        </label>
+        <button type="submit" class="mic-button">Enviar</button>
+        <p id="status" role="status" aria-live="polite"></p>
+      </form>
+    </main>
+    <script type="module" src="/src/feedback.ts"></script>
+  </body>
+</html>

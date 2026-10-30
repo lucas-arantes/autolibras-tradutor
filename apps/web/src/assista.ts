@@ -3,7 +3,9 @@
  *
  * Parâmetros da URL: `video` (arquivo ou HLS `.m3u8`), `legendas` (WebVTT, se a
  * legenda não vier no vídeo), `signs` (pacote de sinais; padrão: o do build) e
- * `libras=1` para já abrir com o avatar ligado.
+ * `libras=1` para já abrir com o avatar ligado. Com `retorno` (endereço que recebe
+ * o retorno, como `/v1/feedback` de um servidor do AutoLibras), aparecem os botões
+ * "Entendi" e "Não entendi".
  */
 import { attachClosedSigning } from "./closed-signing-bundle";
 import { SIGN_PACK_URL } from "./lib/avatar";
@@ -70,8 +72,10 @@ async function load(): Promise<void> {
     status.textContent = "Falta o pacote de sinais do avatar (parâmetro signs).";
     return;
   }
-  const libras = attachClosedSigning(video, { signs });
+  const feedbackUrl = params.get("retorno")?.trim() || undefined;
+  const libras = attachClosedSigning(video, { signs, feedbackUrl });
   document.getElementById("button-slot")?.append(libras.createButton());
+  if (feedbackUrl) document.getElementById("button-slot")?.append(libras.createFeedbackButtons());
   libras.on("toggle", (on) => {
     status.textContent = on ? "Carregando o avatar…" : "";
   });

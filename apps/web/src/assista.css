@@ -21,6 +21,19 @@
   align-items: center;
   flex-wrap: wrap;
 }
+.autolibras-closed-signing-feedback {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-left: 0.75rem;
+}
+.autolibras-closed-signing-feedback button {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+}
 .autolibras-closed-signing-button {
   padding: 0.5rem 1rem;
   border: 1px solid var(--accent);

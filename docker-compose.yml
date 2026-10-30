@@ -1,9 +1,13 @@
-# Sobe o AutoLibras para transmissões: `docker compose up -d` e abra
-# http://localhost:8000/studio.html. Veja docs/transmissoes-obs.md.
+# AutoLibras para transmissões. Numa pasta com este arquivo, rode
+# `docker compose up -d` e abra http://localhost:8000/studio.html.
+# Guia completo: https://github.com/lucas-arantes/autolibras-tradutor/blob/main/docs/transmissoes-obs.md
+#
+# A imagem já vem pronta (Intel/AMD e Apple Silicon). Para montar a partir do
+# código, na raiz do repositório:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 services:
   autolibras:
-    build: .
-    image: autolibras
+    image: ghcr.io/lucas-arantes/autolibras:latest
     restart: unless-stopped
     ports:
       # Só este computador acessa. Para abrir o Estúdio de outro computador da
@@ -15,13 +19,18 @@ services:
       # Senha para criar sessões e enviar áudio. Vazio: sem senha.
       AUTOLIBRAS_TOKEN: ${AUTOLIBRAS_TOKEN:-}
       AUTOLIBRAS_MAX_SESSIONS: ${AUTOLIBRAS_MAX_SESSIONS:-4}
-      # Pacote de sinais do avatar próprio (GPL-3.0, gerado à parte), servido em /signs/.
+      # Onde fica o retorno do público (feedback.jsonl), para sobreviver a reinícios.
+      AUTOLIBRAS_DATA_DIR: /data
+      # Pacote de sinais local, se a pasta abaixo for montada; sem ela, não faz nada.
       AUTOLIBRAS_SIGNS_DIR: /signs
     volumes:
       - models:/models
-      # Pasta com o manifest.json do pacote de sinais. Se ela não existir, o Docker
-      # cria uma vazia, e o Estúdio pede o endereço de um pacote publicado.
-      - ${AUTOLIBRAS_SIGNS:-./sinais}:/signs:ro
+      - data:/data
+      # O avatar próprio usa o pacote de sinais publicado na internet. Para usar
+      # um pacote local (sem internet, ou outra versão), ponha o pacote numa
+      # pasta "sinais" ao lado deste arquivo e descomente a linha abaixo.
+      # - ./sinais:/signs:ro
 
 volumes:
   models:
+  data:

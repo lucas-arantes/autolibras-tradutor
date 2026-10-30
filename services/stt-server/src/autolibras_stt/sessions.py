@@ -11,22 +11,25 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import math
 import re
 import secrets
 import time
+from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 from urllib.parse import urlparse
 
 from . import protocol
+from .captions import CaptionError, follow_embedded_captions, follow_hls_captions
 from .engine import Engine
 from .streaming import StreamingOptions, StreamingSession
 from .vad import Vad
 
 log = logging.getLogger("autolibras_stt.sessions")
 
-SourceType = Literal["audio", "url"]
+SourceType = Literal["audio", "url", "text"]
 SessionState = Literal["waiting", "live", "ended", "error"]
 
 # Protocolos que o ffmpeg pode abrir numa sessão por endereço. Arquivos locais
@@ -42,6 +45,40 @@ SESSION_ID = re.compile(r"[A-Za-z0-9_-]{16,64}")
 
 class SessionError(Exception):
     """Pedido inválido para uma sessão (vira 4xx na API)."""
+
+
+class AudioClock:
+    """Liga a posição no áudio da sessão (segundos) ao relógio do servidor.
+
+    Cada bloco chega depois de ter sido capturado, então `chegada - posição` é um
+    limite superior para o instante em que o áudio começou. O menor valor numa
+    janela recente é a melhor estimativa; a janela deixa o relógio se corrigir
+    quando o envio para (rede caiu, aba suspensa) e o áudio perdido some.
+    """
+
+    def __init__(self, window_s: float = 10.0, now: Callable[[], float] = time.time) -> None:
+        self._window = window_s
+        self._now = now
+        self._samples: deque[tuple[float, float]] = deque()
+
+    def observe(self, position_s: float) -> None:
+        """Registra que o áudio até `position_s` acabou de chegar."""
+        now = self._now()
+        self._samples.append((now, now - position_s))
+        while self._samples and now - self._samples[0][0] > self._window:
+            self._samples.popleft()
+
+    def wall(self, position_s: float) -> float | None:
+        """Horário (epoch, relógio do servidor) em que o áudio em `position_s` foi capturado."""
+        if not self._samples:
+            return None
+        return min(origin for _, origin in self._samples) + position_s
+
+
+def percentile(values: list[float], fraction: float) -> float:
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, math.ceil(fraction * len(ordered)) - 1))
+    return ordered[index]
 
 
 def check_stream_url(url: str) -> str:
@@ -61,10 +98,17 @@ class Session:
     last_activity: float = field(default_factory=time.time)
     state: SessionState = "waiting"
     error: str | None = None
+    # Sessão por endereço que lê a legenda WebVTT do HLS em vez do áudio.
+    captions: bool = False
     ingest_connected: bool = False
     subscribers: set[asyncio.Queue[dict[str, Any]]] = field(default_factory=set)
     task: asyncio.Task[None] | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    clock: AudioClock = field(default_factory=AudioClock)
+    samples: int = 0
+    text_segment: int = 1
+    # Segundos entre o início de cada frase na fala e o envio do final, das últimas frases.
+    latencies: deque[float] = field(default_factory=lambda: deque(maxlen=50))
 
     def info(self) -> dict[str, Any]:
         return {
@@ -73,7 +117,26 @@ class Session:
             "state": self.state,
             "error": self.error,
             "subscribers": len(self.subscribers),
+            "captions": self.captions,
             "createdAt": round(self.created_at),
+            "latency": self.latency(),
+        }
+
+    def latency(self) -> dict[str, float] | None:
+        """Quanto cada frase leva, do começo da fala até o final sair do servidor.
+
+        `recommendedDelay` é o atraso sugerido para o modo sincronizado: cobre 95%
+        das frases e mais 1 s para a tradução em glosa.
+        """
+        if not self.latencies:
+            return None
+        values = list(self.latencies)
+        p95 = percentile(values, 0.95)
+        return {
+            "p50": round(percentile(values, 0.5), 2),
+            "p95": round(p95, 2),
+            "recommendedDelay": math.ceil(p95 + 1),
+            "count": len(values),
         }
 
 
@@ -104,6 +167,7 @@ class SessionHub:
         url: str | None = None,
         realtime: bool = False,
         session_id: str | None = None,
+        captions: bool = False,
     ) -> Session:
         """Cria uma sessão. Com `session_id` já em uso, apague a antiga antes (`delete`)."""
         self.reap()
@@ -115,16 +179,19 @@ class SessionHub:
             raise SessionError("Limite de sessões simultâneas atingido")
         if source == "url":
             check_stream_url(url or "")
-        elif source != "audio":
-            raise SessionError("Fonte desconhecida: use 'audio' ou 'url'")
+        elif source not in ("audio", "text"):
+            raise SessionError("Fonte desconhecida: use 'audio', 'url' ou 'text'")
         session = Session(
             id=session_id or secrets.token_urlsafe(16),
             source=source,
             url=url if source == "url" else None,
             streaming=StreamingSession(self._engine, self._vad, self._options),
+            captions=captions and source == "url",
         )
         self.sessions[session.id] = session
-        if source == "url":
+        if source == "url" and session.captions:
+            session.task = asyncio.create_task(self._ingest_captions(session, realtime))
+        elif source == "url":
             session.task = asyncio.create_task(self._ingest_url(session, realtime))
         log.info("Sessão %s criada (%s)", session.id, source)
         return session
@@ -179,26 +246,102 @@ class SessionHub:
 
     # Áudio -----------------------------------------------------------------
 
-    async def feed(self, session: Session, pcm16: bytes) -> list[protocol.Event]:
+    async def feed(self, session: Session, pcm16: bytes) -> list[dict[str, Any]]:
         """Acrescenta áudio, roda um passo se for a hora e publica os eventos."""
         session.last_activity = time.time()
         if session.state == "waiting":
             self._set_state(session, "live")
+        session.samples += len(pcm16) // 2
+        session.clock.observe(session.samples / protocol.SAMPLE_RATE)
         async with session.lock:
             session.streaming.append(pcm16)
             if not session.streaming.should_step():
                 return []
             events = await self._run(session.streaming.step)
-        for event in events:
-            self.publish(session, event.to_json())
-        return events
+        return self._publish_events(session, events)
 
-    async def flush(self, session: Session) -> list[protocol.Event]:
+    async def flush(self, session: Session) -> list[dict[str, Any]]:
         async with session.lock:
             events = await self._run(session.streaming.flush)
+        return self._publish_events(session, events)
+
+    def _publish_events(
+        self, session: Session, events: list[protocol.Event]
+    ) -> list[dict[str, Any]]:
+        messages = []
         for event in events:
-            self.publish(session, event.to_json())
-        return events
+            message = event.to_json()
+            if isinstance(event, protocol.Final):
+                message |= self._timing(session, event.start, event.end, bool(event.text))
+            self.publish(session, message)
+            messages.append(message)
+        return messages
+
+    def _timing(
+        self, session: Session, start: float | None, end: float | None, measure: bool
+    ) -> dict[str, Any]:
+        """Horários da frase no relógio do servidor, para o modo sincronizado."""
+        now = time.time()
+        wall_start = session.clock.wall(start) if start is not None else now
+        wall_end = session.clock.wall(end) if end is not None else now
+        timing: dict[str, Any] = {"serverTime": round(now, 3)}
+        if wall_start is not None and wall_end is not None:
+            timing |= {"wallStart": round(wall_start, 3), "wallEnd": round(wall_end, 3)}
+            if measure:
+                session.latencies.append(max(0.0, now - wall_start))
+        return timing
+
+    def text(self, session: Session, text: str, final: bool = True) -> dict[str, Any] | None:
+        """Publica um texto pronto (legenda, estenotipia, digitação) como frase da sessão.
+
+        Parciais (`final=False`) só atualizam a legenda; o final vai para o avatar.
+        """
+        session.last_activity = time.time()
+        if session.state == "waiting":
+            self._set_state(session, "live")
+        text = " ".join(text.split())
+        segment_id = f"t{session.text_segment}"
+        if not final:
+            if not text:
+                return None
+            message: dict[str, Any] = {
+                "type": "partial",
+                "id": segment_id,
+                "text": text,
+                "stable": "",
+            }
+        else:
+            session.text_segment += 1
+            message = {"type": "final", "id": segment_id, "text": text, "start": None, "end": None}
+            message |= self._timing(session, None, None, False)
+        self.publish(session, message)
+        return message
+
+    async def _ingest_captions(self, session: Session, realtime: bool) -> None:
+        async def emit(text: str, final: bool) -> None:
+            self.text(session, text, final)
+
+        url = session.url or ""
+        try:
+            try:
+                if ".m3u8" not in url:
+                    raise CaptionError("não é HLS")
+                await follow_hls_captions(url, emit, realtime=realtime)
+            except CaptionError:
+                # Sem faixa WebVTT: tenta o closed caption embutido no vídeo.
+                await follow_embedded_captions(
+                    url, emit, ffmpeg=self._ffmpeg, protocols=FFMPEG_PROTOCOLS, realtime=realtime
+                )
+            self._set_state(session, "ended")
+        except asyncio.CancelledError:
+            raise
+        except CaptionError as error:
+            self._set_state(session, "error", str(error))
+        except Exception as error:  # rede, HTTP, playlist malformada
+            log.warning("Legendas da sessão %s: %s", session.id, error)
+            self._set_state(session, "error", f"Não foi possível ler as legendas: {error}")
+        finally:
+            session.task = None
 
     async def _ingest_url(self, session: Session, realtime: bool) -> None:
         args = [

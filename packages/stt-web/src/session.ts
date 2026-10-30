@@ -22,6 +22,16 @@ export interface SessionRecognizerOptions {
   connect?: (url: string) => SocketLike;
   /** Esperas entre tentativas de reconexão, em ms; a última se repete. */
   retryDelays?: readonly number[];
+  /**
+   * Modo sincronizado: cada frase começa `delaySeconds` depois de ter sido dita,
+   * para acompanhar um vídeo atrasado do mesmo tanto. Sem ele, o sinal sai assim
+   * que a tradução fica pronta.
+   */
+  delaySeconds?: number;
+  /** Relógio de parede em segundos (padrão: `Date.now()`). */
+  epochNow?: () => number;
+  /** Relógio da fila de sinais em segundos (padrão: `performance.now()`). */
+  queueNow?: () => number;
   setTimer?: (callback: () => void, ms: number) => unknown;
   clearTimer?: (timer: unknown) => void;
 }
@@ -30,10 +40,10 @@ export interface SessionRecognizerOptions {
 const POLICY_VIOLATION = 1008;
 
 type EventMessage =
-  | { type: "session"; state: SessionState; error: string | null }
+  | { type: "session"; state: SessionState; error: string | null; serverTime?: number }
   | { type: "state"; state: SessionState; error: string | null }
   | { type: "partial"; id: string; text: string }
-  | { type: "final"; id: string; text: string };
+  | { type: "final"; id: string; text: string; wallStart?: number; serverTime?: number };
 
 /** Endereço WebSocket dos eventos de uma sessão. */
 export function sessionEventsUrl(server: string, sessionId: string): string {
@@ -62,6 +72,11 @@ export class SessionRecognizer
   readonly #retryDelays: readonly number[];
   readonly #setTimer: (callback: () => void, ms: number) => unknown;
   readonly #clearTimer: (timer: unknown) => void;
+  readonly #delaySeconds?: number;
+  readonly #epochNow: () => number;
+  readonly #queueNow: () => number;
+  /** Relógio local menos o do servidor (mais o menor atraso de rede visto). */
+  #clockOffset?: number;
   #socket?: SocketLike;
   #timer?: unknown;
   #active = false;
@@ -76,6 +91,9 @@ export class SessionRecognizer
     retryDelays = [1_000, 2_000, 5_000],
     setTimer = (callback, ms) => setTimeout(callback, ms),
     clearTimer = (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
+    delaySeconds,
+    epochNow = () => Date.now() / 1000,
+    queueNow = () => performance.now() / 1000,
   }: SessionRecognizerOptions) {
     super();
     this.#url = sessionEventsUrl(server, sessionId);
@@ -83,6 +101,9 @@ export class SessionRecognizer
     this.#retryDelays = retryDelays;
     this.#setTimer = setTimer;
     this.#clearTimer = clearTimer;
+    this.#delaySeconds = delaySeconds;
+    this.#epochNow = epochNow;
+    this.#queueNow = queueNow;
   }
 
   get url(): string {
@@ -108,6 +129,7 @@ export class SessionRecognizer
 
   #open(): void {
     const connection = ++this.#connection;
+    this.#clockOffset = undefined;
     this.emit("session", { state: "connecting" });
     const socket = this.#connect(this.#url);
     this.#socket = socket;
@@ -117,11 +139,13 @@ export class SessionRecognizer
     socket.onclose = (event?: { code?: number }) => {
       if (connection !== this.#connection || !this.#active) return;
       this.#socket = undefined;
-      this.#failures++;
+      // Sessão que ainda não existe: tenta de novo logo, para pegar o começo dela.
+      const missing = event?.code === POLICY_VIOLATION;
+      this.#failures = missing ? 1 : this.#failures + 1;
       if (this.#lastState === "ended") {
         // Encerrada no Estúdio: espera uma nova sessão com o mesmo id.
         this.emit("session", { state: "ended" });
-      } else if (event?.code === POLICY_VIOLATION) {
+      } else if (missing) {
         this.emit("session", { state: "missing" });
       } else {
         this.emit("session", {
@@ -148,6 +172,10 @@ export class SessionRecognizer
     } catch {
       return;
     }
+    if ("serverTime" in message && typeof message.serverTime === "number") {
+      const offset = this.#epochNow() - message.serverTime;
+      this.#clockOffset = Math.min(this.#clockOffset ?? offset, offset);
+    }
     switch (message.type) {
       case "session":
       case "state":
@@ -167,9 +195,17 @@ export class SessionRecognizer
           text: message.text,
           isFinal,
           timestamp: Date.now(),
+          playAt: message.type === "final" ? this.#playAt(message.wallStart) : undefined,
         });
         break;
       }
     }
+  }
+
+  /** Converte o horário da fala (relógio do servidor) para o relógio da fila. */
+  #playAt(wallStart: number | undefined): number | undefined {
+    if (this.#delaySeconds === undefined || wallStart === undefined) return undefined;
+    const localStart = wallStart + (this.#clockOffset ?? 0);
+    return this.#queueNow() + (localStart + this.#delaySeconds - this.#epochNow());
   }
 }

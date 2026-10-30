@@ -30,7 +30,7 @@ Com o Docker, um comando sobe o servidor de transcrição junto com o Estúdio e
 docker compose up -d
 ```
 
-No Estúdio (http://localhost:8000/studio.html), você escolhe de onde vem o áudio: um dispositivo do computador (microfone, mesa de som, cabo virtual) ou o endereço da transmissão (RTMP, SRT ou HLS), que o servidor lê com o ffmpeg. O Estúdio mostra o endereço do overlay, que entra no OBS como fonte de navegador. O endereço não muda de uma live para outra. O passo a passo está em [Libras na sua live com o OBS](docs/transmissoes-obs.md).
+No Estúdio (http://localhost:8000/studio.html), você escolhe a fonte: um dispositivo de áudio do computador (microfone, mesa de som, cabo virtual), o endereço da transmissão (RTMP, SRT ou HLS), que o servidor lê com o ffmpeg, ou texto. Do endereço, o servidor pode usar a legenda da transmissão (WebVTT ou closed caption) em vez de reconhecer a fala. O texto pode ser digitado ou enviado por outro programa pela API. O Estúdio mostra o endereço do overlay, que entra no OBS como fonte de navegador. O endereço não muda de uma live para outra. O passo a passo está em [Libras na sua live com o OBS](docs/transmissoes-obs.md).
 
 O overlay usa o avatar próprio, com fundo transparente e o tradutor de regras local, sem depender dos serviços do VLibras. Ele precisa de um pacote de sinais, que o servidor serve a partir da pasta `sinais`. O avatar do VLibras também pode ser escolhido, mas os termos de uso do VLibras não autorizam tradução automática em produções audiovisuais, então ele fica para testes.
 

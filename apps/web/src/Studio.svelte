@@ -12,6 +12,7 @@ import {
   type StudioSettings,
   saveStudioSettings,
   signPackFor,
+  textUrl,
 } from "./lib/studio";
 
 let { initial, pageBase }: { initial: StudioSettings; pageBase: string } = $props();
@@ -27,6 +28,8 @@ let error = $state<string | null>(null);
 let transcript = $state("");
 let devices = $state<MediaDeviceInfo[]>([]);
 let copied = $state(false);
+let typed = $state("");
+let sentTexts = $state<string[]>([]);
 
 let recognizer: RemoteWhisperRecognizer | undefined;
 let poll: ReturnType<typeof setInterval> | undefined;
@@ -138,6 +141,23 @@ async function stop(): Promise<void> {
   }
 }
 
+async function sendText(event: SubmitEvent): Promise<void> {
+  event.preventDefault();
+  const text = typed.trim();
+  if (!text) return;
+  try {
+    await api.text(settings.sessionId, text);
+    sentTexts = [text, ...sentTexts].slice(0, 5);
+    typed = "";
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e);
+  }
+}
+
+function useRecommendedDelay(): void {
+  if (session?.latency) settings.syncDelay = session.latency.recommendedDelay;
+}
+
 async function copy(): Promise<void> {
   await navigator.clipboard.writeText(overlay);
   copied = true;
@@ -215,7 +235,7 @@ onDestroy(() => {
   </section>
 
   <section class="card">
-    <h2>2. Áudio da transmissão</h2>
+    <h2>2. Fonte da tradução</h2>
     <fieldset disabled={running}>
       <label class="choice">
         <input type="radio" bind:group={settings.source} value="audio" />
@@ -258,8 +278,22 @@ onDestroy(() => {
             <input type="checkbox" bind:checked={settings.realtime} />
             É um vídeo gravado (ler na velocidade normal, como se fosse ao vivo)
           </label>
+          <label class="check">
+            <input type="checkbox" bind:checked={settings.captions} />
+            Usar a legenda da transmissão (WebVTT do HLS ou closed caption) em vez de reconhecer a fala
+          </label>
         </div>
       {/if}
+      <label class="choice">
+        <input type="radio" bind:group={settings.source} value="text" />
+        <span>
+          <strong>Texto</strong>
+          <small>
+            Digitado aqui ou enviado por outro programa, como um sistema de legendas ou de
+            estenotipia.
+          </small>
+        </span>
+      </label>
     </fieldset>
     <div class="actions">
       {#if running}
@@ -279,6 +313,21 @@ onDestroy(() => {
       <p class="caption partial" aria-live="polite">
         {transcript || "A transcrição aparece aqui quando alguém falar."}
       </p>
+    {/if}
+    {#if running && settings.source === "text"}
+      <form class="fields text-form" onsubmit={sendText}>
+        <div class="row">
+          <input type="text" bind:value={typed} aria-label="Texto para traduzir" />
+          <button type="submit" class="secondary" disabled={!typed.trim()}>Enviar</button>
+        </div>
+        {#each sentTexts as text, index (index)}
+          <small class="muted">Enviado: {text}</small>
+        {/each}
+        <small class="muted">
+          Para outro programa enviar o texto: POST em <code>{textUrl(settings.server, settings.sessionId)}</code>
+          com <code>{'{"text": "..."}'}</code>{settings.token ? " e o token no cabeçalho Authorization" : ""}.
+        </small>
+      </form>
     {/if}
   </section>
 
@@ -328,6 +377,46 @@ onDestroy(() => {
           Use o avatar do VLibras só para testes.
         </p>
       {/if}
+      <div class="sync">
+        <label class="check">
+          <input
+            type="checkbox"
+            checked={settings.syncDelay > 0}
+            onchange={(event) => {
+              settings.syncDelay = event.currentTarget.checked
+                ? (session?.latency?.recommendedDelay ?? 8)
+                : 0;
+            }}
+          />
+          Modo sincronizado: o vídeo da transmissão está atrasado em
+          <input
+            type="number"
+            min="1"
+            max="60"
+            class="seconds"
+            bind:value={settings.syncDelay}
+            disabled={settings.syncDelay <= 0}
+            aria-label="Atraso do vídeo, em segundos"
+          />
+          segundos
+        </label>
+        {#if session?.latency}
+          <small class="muted">
+            Nesta sessão, metade das frases ficou pronta em {session.latency.p50} s e 95% em até
+            {session.latency.p95} s, contando do começo da fala. Atraso sugerido:
+            {session.latency.recommendedDelay} s.
+            {#if settings.syncDelay > 0 && settings.syncDelay !== session.latency.recommendedDelay}
+              <button type="button" class="link" onclick={useRecommendedDelay}>Usar o sugerido</button>
+            {/if}
+          </small>
+        {/if}
+        <small class="muted">
+          No modo sincronizado, cada frase começa no tempo exato da fala no vídeo atrasado. O atraso
+          precisa ser aplicado ao vídeo e ao áudio da transmissão, mas não ao overlay, no sistema
+          de produção. O OBS sozinho não tem um jeito simples de fazer isso por vários segundos.
+          Sem esse atraso, deixe o modo desligado.
+        </small>
+      </div>
       <ol class="steps">
         <li>No OBS, em <em>Fontes</em>, clique em <strong>+</strong> e escolha <em>Navegador</em>.</li>
         <li>
@@ -414,6 +503,26 @@ onDestroy(() => {
     margin-top: 1rem;
     min-height: 0;
     font-size: 1.1rem;
+  }
+  .sync {
+    display: grid;
+    gap: 0.35rem;
+  }
+  .seconds {
+    width: 4.5rem;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+  }
+  .text-form {
+    margin-top: 1rem;
+  }
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    word-break: break-all;
   }
   .steps {
     margin: 0;

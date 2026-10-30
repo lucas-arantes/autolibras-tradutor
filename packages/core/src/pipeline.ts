@@ -72,7 +72,7 @@ export class Pipeline extends Emitter<PipelineEvents> {
     const unsubscribe = [
       recognizer.on("transcript", (segment) => {
         this.emit("transcript", segment);
-        if (segment.isFinal) this.#translate(segment.id, segment.text);
+        if (segment.isFinal) this.#translate(segment.id, segment.text, segment.playAt);
       }),
       recognizer.on("error", (error) => this.emit("error", { source: "recognizer", error })),
     ];
@@ -102,7 +102,7 @@ export class Pipeline extends Emitter<PipelineEvents> {
     return this.#order;
   }
 
-  #translate(id: string, text: string): void {
+  #translate(id: string, text: string, notBefore?: number): void {
     const trimmed = text.trim();
     if (!trimmed) return;
     const generation = this.#generation;
@@ -120,7 +120,7 @@ export class Pipeline extends Emitter<PipelineEvents> {
       const { gloss, source } = outcome.result;
       this.emit("gloss", { id, text: trimmed, gloss, source });
       if (countSigns(gloss) === 0) return;
-      const item = { id, text: trimmed, gloss };
+      const item: SignItem = { id, text: trimmed, gloss, notBefore };
       if (generation === this.#generation) this.queue.enqueue(item);
       else this.emit("drop", [item]);
     });

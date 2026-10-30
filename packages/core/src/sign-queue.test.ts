@@ -98,3 +98,69 @@ describe("SignQueue", () => {
     expect(queue.state.pending).toHaveLength(0);
   });
 });
+
+describe("SignQueue no modo sincronizado", () => {
+  function scheduled() {
+    const renderer = new FakeRenderer();
+    let now = 100;
+    const waits: Array<{ seconds: number; resolve: () => void }> = [];
+    const queue = new SignQueue(
+      renderer,
+      { secondsPerSign: 1, maxLagSeconds: 5 },
+      () => now,
+      (seconds) => new Promise<void>((resolve) => waits.push({ seconds, resolve })),
+    );
+    const advance = async (seconds: number) => {
+      now += seconds;
+      for (const wait of waits.splice(0)) wait.resolve();
+      await flush();
+    };
+    return { renderer, queue, waits, advance };
+  }
+
+  it("espera a hora marcada antes de sinalizar", async () => {
+    const { renderer, queue, waits, advance } = scheduled();
+    queue.enqueue({ ...item("a", 2), notBefore: 103 });
+    await flush();
+    expect(renderer.played).toEqual([]);
+    expect(waits.map((w) => w.seconds)).toEqual([3]);
+    expect(queue.state.pending.map((i) => i.id)).toEqual(["a"]);
+    await advance(3);
+    expect(renderer.played).toEqual(["S0 S1"]);
+  });
+
+  it("toca na hora um item que chegou atrasado", async () => {
+    const { renderer, queue, waits } = scheduled();
+    queue.enqueue({ ...item("a", 1), notBefore: 99 });
+    await flush();
+    expect(waits).toHaveLength(0);
+    expect(renderer.played).toEqual(["S0"]);
+  });
+
+  it("não descarta nem acelera por causa de itens marcados para o futuro", async () => {
+    const { renderer, queue } = scheduled();
+    const dropped: string[] = [];
+    queue.on("drop", (items) => dropped.push(...items.map((i) => i.id)));
+    queue.enqueue({ ...item("a", 4), notBefore: 110 });
+    queue.enqueue({ ...item("b", 4), notBefore: 120 });
+    queue.enqueue({ ...item("c", 4), notBefore: 130 });
+    await flush();
+    expect(dropped).toEqual([]);
+    expect(queue.state.lagSeconds).toBe(0);
+    expect(renderer.speeds).toEqual([]);
+  });
+
+  it("clear cancela o item que esperava a hora", async () => {
+    const { renderer, queue, advance } = scheduled();
+    queue.enqueue({ ...item("a", 1), notBefore: 105 });
+    await flush();
+    queue.clear();
+    await flush();
+    // O item novo não espera o timer do antigo.
+    queue.enqueue(item("b", 1));
+    await flush();
+    expect(renderer.played).toEqual(["S0"]);
+    await advance(10);
+    expect(renderer.played).toEqual(["S0"]);
+  });
+});

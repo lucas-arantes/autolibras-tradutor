@@ -28,14 +28,15 @@ Na primeira vez, o Docker monta a imagem e o servidor baixa o modelo Whisper, o 
 
 Para conferir, abra <http://localhost:8000/health>. Deve aparecer `"status":"ok"`.
 
-## 2. Escolha o áudio no Estúdio
+## 2. Escolha a fonte no Estúdio
 
 Abra <http://localhost:8000/studio.html> num navegador atualizado.
 
-Em **Áudio da transmissão**, escolha uma das opções:
+Em **Fonte da tradução**, escolha uma das opções:
 
 - **Dispositivo de áudio deste computador**: o microfone de quem fala, a mesa de som ou a placa de captura. Clique em **Listar dispositivos** e escolha o certo. Se o som da live só existe dentro do OBS (vídeo, música, convidados), mande o monitor de áudio do OBS para um cabo virtual e escolha o cabo aqui: [VB-CABLE](https://vb-audio.com/Cable/) no Windows, [BlackHole](https://github.com/ExistentialAudio/BlackHole) no macOS e um `null-sink` do PipeWire ou do PulseAudio no Linux. A aba do Estúdio precisa ficar aberta durante a live.
-- **Endereço da transmissão**: o servidor lê o áudio direto de um endereço `rtmp://`, `srt://` ou de uma playlist HLS (`.m3u8`), e o Estúdio pode ser fechado. Serve para quem tem o próprio servidor RTMP ou o endereço HLS da live. Um link de página, como `youtube.com/watch?v=…`, não funciona: é preciso o endereço do fluxo. Para testar com um vídeo gravado, marque **É um vídeo gravado**.
+- **Endereço da transmissão**: o servidor lê o áudio direto de um endereço `rtmp://`, `srt://` ou de uma playlist HLS (`.m3u8`), e o Estúdio pode ser fechado. Serve para quem tem o próprio servidor RTMP ou o endereço HLS da live. Um link de página, como `youtube.com/watch?v=…`, não funciona: é preciso o endereço do fluxo. Para testar com um vídeo gravado, marque **É um vídeo gravado**. Se a transmissão tem legenda, marque **Usar a legenda da transmissão**: o servidor lê a faixa WebVTT do HLS ou o closed caption (CEA-608) embutido no vídeo, que costuma ser mais fiel que o reconhecimento de fala.
+- **Texto**: você digita as frases no Estúdio, ou outro programa (um sistema de legendas, uma estenotipia) as envia pela API. O Estúdio mostra o endereço para isso.
 
 Clique em **Iniciar tradução**. Quando alguém falar, a transcrição aparece logo abaixo do botão.
 
@@ -52,7 +53,17 @@ O endereço do overlay não muda de uma live para outra, então esta etapa é fe
 
 Fale perto do microfone ou toque um vídeo. O avatar começa a sinalizar alguns segundos depois de cada frase: o servidor espera a pausa no fim da frase, transcreve, e o tradutor gera a glosa. Num teste em CPU com o modelo `small` e o avatar próprio, o primeiro sinal saiu cerca de 2 segundos depois do fim da fala; com o avatar e o tradutor do VLibras, cerca de 3 segundos. Quando a fala é rápida, as frases entram numa fila e o avatar acelera um pouco para não ficar para trás.
 
+Na fala corrida, sem pausas, cada frase sai assim que termina com ponto, interrogação ou exclamação, sem esperar o fim da fala.
+
 Para encerrar, clique em **Parar** no Estúdio. O avatar para de sinalizar e volta a funcionar sozinho na próxima vez que você iniciar, sem mexer no OBS.
+
+## Modo sincronizado
+
+No modo normal, o avatar sinaliza alguns segundos depois da fala. Se o seu sistema de produção consegue atrasar o vídeo e o áudio da transmissão sem atrasar o overlay, o avatar pode sinalizar junto com a fala: marque **Modo sincronizado** no Estúdio e informe o atraso, em segundos. O overlay passa a começar cada frase esse tanto depois de ela ter sido dita.
+
+O atraso precisa cobrir o tempo de processamento. Durante a sessão, o Estúdio mostra quanto as frases estão levando e sugere um valor. Se uma frase ficar pronta depois da hora, o avatar a sinaliza assim que puder.
+
+O OBS sozinho não tem um jeito simples de atrasar o vídeo e o áudio de uma cena por vários segundos. Sem esse atraso no sistema de produção, deixe o modo desligado.
 
 ## Problemas comuns
 

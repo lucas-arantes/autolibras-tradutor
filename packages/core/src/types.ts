@@ -6,6 +6,8 @@ export interface TranscriptSegment {
   text: string;
   isFinal: boolean;
   timestamp: number;
+  /** Modo sincronizado: instante (relógio da fila) em que o sinal deve começar. */
+  playAt?: number;
 }
 
 export type RecognizerState = "idle" | "listening" | "error";

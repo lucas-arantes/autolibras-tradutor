@@ -2,7 +2,7 @@
 import type { VLibrasAvatar } from "@autolibras/vlibras";
 import { SIGN_PACK_URL } from "./avatar";
 
-export type StudioSource = "audio" | "url";
+export type StudioSource = "audio" | "url" | "text";
 /** Avatar do overlay: o próprio do AutoLibras ou um personagem do VLibras. */
 export type StudioAvatar = "propio" | VLibrasAvatar;
 
@@ -17,6 +17,10 @@ export interface StudioSettings {
   streamUrl: string;
   /** Vídeo gravado: o servidor lê na velocidade real. */
   realtime: boolean;
+  /** Endereço: usar a legenda da transmissão (WebVTT ou closed caption) em vez da fala. */
+  captions: boolean;
+  /** Modo sincronizado: atraso, em segundos, do vídeo da transmissão. 0 desliga. */
+  syncDelay: number;
   avatar: StudioAvatar;
   /** Pacote de sinais do avatar próprio. Vazio: o do servidor, se houver, ou o do build. */
   signsUrl: string;
@@ -38,6 +42,8 @@ export interface SessionInfo {
   state: "waiting" | "live" | "ended" | "error";
   error: string | null;
   subscribers: number;
+  /** Segundos do começo da fala até o final sair do servidor, nas últimas frases. */
+  latency: { p50: number; p95: number; recommendedDelay: number; count: number } | null;
 }
 
 const KEY = "autolibras:studio";
@@ -60,6 +66,8 @@ export function defaultSettings(origin: string, servedByServer: boolean): Studio
     deviceId: "",
     streamUrl: "",
     realtime: false,
+    captions: false,
+    syncDelay: 0,
     avatar: "propio",
     signsUrl: "",
     caption: false,
@@ -100,7 +108,10 @@ export function signPackFor(
 
 /** Endereço para colar no OBS. */
 export function overlayUrl(
-  settings: Pick<StudioSettings, "server" | "sessionId" | "avatar" | "signsUrl" | "caption">,
+  settings: Pick<
+    StudioSettings,
+    "server" | "sessionId" | "avatar" | "signsUrl" | "caption" | "syncDelay"
+  >,
   pageBase: string,
   server: Pick<ServerHealth, "web" | "signs"> | null,
   buildPack: string = SIGN_PACK_URL,
@@ -117,6 +128,7 @@ export function overlayUrl(
     if (signs && signs !== buildPack) url.searchParams.set("signs", signs);
   }
   if (settings.caption) url.searchParams.set("legenda", "1");
+  if (settings.syncDelay > 0) url.searchParams.set("atraso", String(settings.syncDelay));
   return url.toString();
 }
 
@@ -126,6 +138,15 @@ export function ingestUrl(server: string, sessionId: string, token: string): str
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   if (token) url.searchParams.set("token", token);
   return url.toString();
+}
+
+function textPath(sessionId: string): string {
+  return `v1/sessions/${encodeURIComponent(sessionId)}/text`;
+}
+
+/** Endereço para outros programas (estenotipia, sistema de legendas) enviarem texto. */
+export function textUrl(server: string, sessionId: string): string {
+  return new URL(textPath(sessionId), base(server)).toString();
 }
 
 export class SessionApi {
@@ -142,13 +163,23 @@ export class SessionApi {
   create(settings: StudioSettings): Promise<SessionInfo> {
     const source =
       settings.source === "url"
-        ? { type: "url", url: settings.streamUrl.trim(), realtime: settings.realtime }
-        : { type: "audio" };
+        ? {
+            type: "url",
+            url: settings.streamUrl.trim(),
+            realtime: settings.realtime,
+            captions: settings.captions,
+          }
+        : { type: settings.source };
     return this.#request<SessionInfo>("POST", "v1/sessions", { id: settings.sessionId, source });
   }
 
   get(sessionId: string): Promise<SessionInfo> {
     return this.#request<SessionInfo>("GET", `v1/sessions/${encodeURIComponent(sessionId)}`);
+  }
+
+  /** Envia um texto pronto para a sessão: `final` vai para o avatar; senão, só a legenda. */
+  async text(sessionId: string, text: string, final = true): Promise<void> {
+    await this.#request<unknown>("POST", textPath(sessionId), { text, final });
   }
 
   async delete(sessionId: string): Promise<void> {

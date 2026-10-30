@@ -13,6 +13,9 @@
  * - `bg=transparent` ou uma cor CSS: fundo do avatar próprio (padrão: transparente);
  * - `translator=vlibras|regras`. Padrão: regras locais com o avatar próprio, para a
  *   live não depender dos serviços do VLibras; tradutor do VLibras com o avatar dele;
+ * - `atraso=N` (segundos): modo sincronizado. Cada frase começa N segundos depois de
+ *   ter sido dita, para acompanhar um vídeo atrasado do mesmo tanto. O Estúdio
+ *   sugere o valor; sem ele, o sinal sai assim que a tradução fica pronta;
  * - `legenda=1`: mostra a frase que está sendo sinalizada;
  * - `status=1`: mostra o estado da conexão (útil ao configurar; some quando tudo vai bem).
  */
@@ -84,9 +87,11 @@ if (avatar.canvas) {
 }
 const { renderer } = avatar;
 const pipeline = new Pipeline({ translator, renderer });
+const delay = Number(params.get("atraso"));
 const recognizer = new SessionRecognizer({
   server: params.get("server") || location.origin,
   sessionId,
+  delaySeconds: Number.isFinite(delay) && delay > 0 ? delay : undefined,
 });
 pipeline.attach(recognizer);
 

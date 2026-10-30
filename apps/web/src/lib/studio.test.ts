@@ -6,6 +6,7 @@ import {
   overlayUrl,
   SessionApi,
   signPackFor,
+  textUrl,
 } from "./studio";
 
 describe("Estúdio", () => {
@@ -74,8 +75,49 @@ describe("Estúdio", () => {
     expect(new Headers(calls[0]?.init?.headers).get("Authorization")).toBe("Bearer s3");
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
       id: "abc",
-      source: { type: "url", url: "rtmp://x.test/live", realtime: false },
+      source: { type: "url", url: "rtmp://x.test/live", realtime: false, captions: false },
     });
     await expect(api.get("abc")).rejects.toThrow("Limite de sessões");
+  });
+
+  it("leva o atraso do modo sincronizado para o overlay", () => {
+    const settings = {
+      ...defaultSettings("http://pc.local:8000", true),
+      sessionId: "abc",
+      avatar: "icaro" as const,
+      syncDelay: 7,
+    };
+    expect(overlayUrl(settings, "", { web: true, signs: false }, "")).toBe(
+      "http://pc.local:8000/broadcast.html?session=abc&avatar=icaro&atraso=7",
+    );
+  });
+
+  it("cria sessões de texto e de legenda e envia texto", async () => {
+    const bodies: unknown[] = [];
+    const urls: string[] = [];
+    const api = new SessionApi("http://srv.test", "", async (url, init) => {
+      urls.push(String(url));
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response("{}", { status: 200 });
+    });
+    const base = { ...defaultSettings("", false), sessionId: "abc" };
+    await api.create({ ...base, source: "text" });
+    await api.create({
+      ...base,
+      source: "url",
+      streamUrl: "https://tv.test/a.m3u8",
+      captions: true,
+    });
+    await api.text("abc", "Boa noite.");
+    expect(bodies).toEqual([
+      { id: "abc", source: { type: "text" } },
+      {
+        id: "abc",
+        source: { type: "url", url: "https://tv.test/a.m3u8", realtime: false, captions: true },
+      },
+      { text: "Boa noite.", final: true },
+    ]);
+    expect(urls[2]).toBe(textUrl("http://srv.test", "abc"));
+    expect(urls[2]).toBe("http://srv.test/v1/sessions/abc/text");
   });
 });

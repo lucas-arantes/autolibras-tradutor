@@ -93,3 +93,42 @@ def test_filtra_alucinacoes_conhecidas() -> None:
     assert is_hallucination(" ... ")
     assert not is_hallucination("Obrigado pela ajuda.")
     assert not is_hallucination("E aí, tudo bem?")
+
+
+def test_frase_completa_sai_antes_da_pausa_na_fala_corrida() -> None:
+    engine = FakeEngine(
+        [
+            "Bom dia a",
+            "Bom dia a todos. Hoje",
+            "Bom dia a todos. Hoje vamos",
+            "Bom dia a todos. Hoje vamos falar",
+            "Bom dia a todos. Hoje vamos falar de Libras.",
+        ]
+    )
+    session = StreamingSession(engine, energy_vad())
+    events = feed(session, np.concatenate([silence(0.5), tone(4.2), silence(1)]))
+    finals = [e for e in events if isinstance(e, Final)]
+    assert [(f.id, f.text) for f in finals] == [
+        ("s1", "Bom dia a todos."),
+        ("s2", "Hoje vamos falar de Libras."),
+    ]
+    # O primeiro final saiu antes do fim da fala, e o segundo começa onde ele acabou.
+    assert finals[0].end < 4.7
+    assert finals[1].start == finals[0].end
+    partials_s2 = [e.text for e in events if isinstance(e, Partial) and e.id == "s2"]
+    assert all(not text.startswith("Bom dia") for text in partials_s2)
+
+
+def test_ponto_no_fim_da_hipotese_nao_corta_a_frase() -> None:
+    # O Whisper pôs ponto em "vou." porque o áudio acabou ali, não porque a frase acabou.
+    engine = FakeEngine(["Hoje eu vou.", "Hoje eu vou.", "Hoje eu vou ao mercado"])
+    session = StreamingSession(engine, energy_vad())
+    events = feed(session, np.concatenate([silence(0.5), tone(3.2)]))
+    assert not [e for e in events if isinstance(e, Final)]
+
+
+def test_frase_curta_espera_a_pausa() -> None:
+    engine = FakeEngine(["Ah. Bom", "Ah. Bom dia", "Ah. Bom dia a todos"])
+    session = StreamingSession(engine, energy_vad())
+    events = feed(session, np.concatenate([silence(0.5), tone(3.2)]))
+    assert not [e for e in events if isinstance(e, Final)]

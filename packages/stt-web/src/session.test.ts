@@ -108,11 +108,15 @@ describe("SessionRecognizer", () => {
     sockets[0]?.close(1008);
     expect(sessions.at(-1)?.state).toBe("missing");
     timers[0]?.callback();
-    sockets[1]?.receive({ type: "session", state: "live", error: null });
-    sockets[1]?.receive({ type: "state", state: "ended", error: null });
-    sockets[1]?.close(1000);
+    sockets[1]?.close(1008);
+    // Enquanto a sessão não existe, a espera não cresce.
+    expect(timers.map((t) => t.ms)).toEqual([100, 100]);
+    timers[1]?.callback();
+    sockets[2]?.receive({ type: "session", state: "live", error: null });
+    sockets[2]?.receive({ type: "state", state: "ended", error: null });
+    sockets[2]?.close(1000);
     expect(sessions.at(-1)?.state).toBe("ended");
-    expect(timers).toHaveLength(2);
+    expect(timers).toHaveLength(3);
   });
 
   it("stop fecha a conexão e cancela a reconexão", () => {
@@ -129,5 +133,48 @@ describe("SessionRecognizer", () => {
     recognizer.stop();
     expect(sockets[1]?.closed).toBe(true);
     expect(timers).toHaveLength(1);
+  });
+});
+
+describe("SessionRecognizer no modo sincronizado", () => {
+  it("marca cada frase para o horário da fala mais o atraso, no relógio da fila", () => {
+    const sockets: FakeSocket[] = [];
+    let epoch = 5_000;
+    const recognizer = new SessionRecognizer({
+      server: "http://servidor.test",
+      sessionId: "abc",
+      connect: (url) => {
+        const socket = new FakeSocket(url);
+        sockets.push(socket);
+        return socket;
+      },
+      delaySeconds: 8,
+      // O relógio deste computador está 2 s adiantado em relação ao do servidor.
+      epochNow: () => epoch,
+      queueNow: () => epoch - 4_000,
+    });
+    const transcripts: TranscriptSegment[] = [];
+    recognizer.on("transcript", (t) => transcripts.push(t));
+    recognizer.start();
+    // Chega com 0,3 s de rede: a estimativa fica em 2,3 s de diferença...
+    sockets[0]?.receive({ type: "session", state: "live", error: null, serverTime: 4_997.7 });
+    // ...e cai para 2,05 quando uma mensagem chega mais rápido.
+    epoch = 5_010;
+    sockets[0]?.receive({
+      type: "final",
+      id: "s1",
+      text: "Bom dia.",
+      wallStart: 5_004,
+      serverTime: 5_007.95,
+    });
+    // Fala em 5004 (servidor) = 5006,05 (local); +8 s = 5014,05 → fila: 1014,05.
+    expect(transcripts[0]?.playAt).toBeCloseTo(1_014.05, 5);
+  });
+
+  it("sem atraso, não marca horário", () => {
+    const { recognizer, sockets, transcripts } = setup();
+    recognizer.start();
+    sockets[0]?.receive({ type: "final", id: "s1", text: "Oi", wallStart: 1, serverTime: 2 });
+    expect(transcripts[0]?.playAt).toBeUndefined();
   });
 });

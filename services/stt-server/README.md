@@ -94,12 +94,17 @@ Uma sessão tem uma entrada de áudio e quantos assinantes quiser. O id dela fun
 
 | Rota | O que faz |
 |---|---|
-| `POST /v1/sessions` | Cria uma sessão. Corpo: `{"source": {"type": "audio"}}` ou `{"source": {"type": "url", "url": "rtmp://…", "realtime": false}}`. O campo opcional `id` (16 a 64 letras, números, `-` ou `_`) fixa o id; se já existir uma sessão com ele, a antiga é encerrada. `realtime` faz o ffmpeg ler um vídeo gravado na velocidade normal |
+| `POST /v1/sessions` | Cria uma sessão. Corpo: `{"source": {"type": "audio"}}`, `{"source": {"type": "text"}}` ou `{"source": {"type": "url", "url": "rtmp://…", "realtime": false, "captions": false}}`. O campo opcional `id` (16 a 64 letras, números, `-` ou `_`) fixa o id; se já existir uma sessão com ele, a antiga é encerrada. `realtime` faz o ffmpeg ler um vídeo gravado na velocidade normal. Com `captions`, a sessão usa a legenda da transmissão em vez da fala: primeiro a faixa WebVTT de um `.m3u8` (de preferência em português) e, sem ela, o closed caption CEA-608 embutido no vídeo |
 | `GET /v1/sessions` | Lista as sessões |
-| `GET /v1/sessions/{id}` | Estado da sessão (`waiting`, `live`, `ended` ou `error`) e número de assinantes. Não pede token |
+| `GET /v1/sessions/{id}` | Estado da sessão (`waiting`, `live`, `ended` ou `error`), número de assinantes e `latency`: segundos do começo da fala até o final sair, nas últimas 50 frases (`p50`, `p95`) e o atraso sugerido para o modo sincronizado (`recommendedDelay`). Não pede token |
 | `DELETE /v1/sessions/{id}` | Encerra a sessão e fecha as conexões dos assinantes |
-| `WS /v1/sessions/{id}/ingest` | Entrada de áudio das sessões `audio`, com o mesmo protocolo de `/v1/stream`. Aceita uma conexão por vez |
+| `POST /v1/sessions/{id}/text` | Texto pronto para a sessão, como uma legenda ou uma estenotipia: `{"text": "Boa noite.", "final": true}`. Com `final: false`, só atualiza a legenda na tela; o final vai para o avatar |
+| `WS /v1/sessions/{id}/ingest` | Entrada das sessões `audio` e `text`, com o mesmo protocolo de `/v1/stream`, mais mensagens `{"type": "text", "text": "...", "final": true}`. Aceita uma conexão por vez |
 | `WS /v1/sessions/{id}/events` | Saída para os assinantes. Primeiro chega `{"type": "session", ...}` com o estado, depois `partial`, `final` e `{"type": "state", "state": ..., "error": ...}` a cada mudança |
+
+Os `final` das sessões trazem também `wallStart` e `wallEnd`, o horário (epoch, em segundos, no relógio do servidor) em que a fala começou e terminou, e `serverTime`, o horário do envio. O servidor estima esse horário pela chegada do áudio. Com eles, o overlay faz o modo sincronizado: com `atraso=N`, cada frase começa N segundos depois de ter sido dita, e o `serverTime` corrige a diferença entre os relógios do servidor e do computador do overlay.
+
+Na fala corrida, uma frase completa (terminada em `.`, `?` ou `!`) que se repetiu em duas hipóteses seguidas sai como `final` sem esperar a pausa. Nesse caso, `start` e `end` são estimados pela proporção de palavras.
 
 Nas sessões por endereço, o ffmpeg só pode abrir `rtmp`, `rtmps`, `srt`, `http` e `https` (e os protocolos de que eles dependem, como HLS), para que ninguém use o servidor para ler arquivos do próprio disco. Sessões sem áudio chegando há mais de 15 minutos são encerradas quando outra sessão é criada.
 

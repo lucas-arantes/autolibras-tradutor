@@ -6,6 +6,11 @@ export interface SignItem {
   /** Texto em português que originou a glosa. */
   text: string;
   gloss: string;
+  /**
+   * Não começar antes deste instante, no relógio da fila (modo sincronizado: o
+   * sinal sai junto com a fala de um vídeo atrasado de propósito).
+   */
+  notBefore?: number;
 }
 
 export interface SignQueueOptions {
@@ -69,6 +74,7 @@ export function countSigns(gloss: string): number {
 export class SignQueue extends Emitter<SignQueueEvents> {
   readonly #renderer: AvatarRenderer;
   readonly #now: () => number;
+  readonly #wait: (seconds: number) => Promise<void>;
   #options: SignQueueOptions;
   #pending: SignItem[] = [];
   #current: SignItem | null = null;
@@ -79,15 +85,20 @@ export class SignQueue extends Emitter<SignQueueEvents> {
   #secondsPerSign: number;
   /** Incrementado por `clear()`, para não medir uma reprodução interrompida. */
   #generation = 0;
+  /** Encerra a espera pela hora marcada de um item (usado por `clear()`). */
+  #wake?: () => void;
 
   constructor(
     renderer: AvatarRenderer,
     options: Partial<SignQueueOptions> = {},
     now: () => number = () => performance.now() / 1000,
+    wait: (seconds: number) => Promise<void> = (seconds) =>
+      new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
   ) {
     super();
     this.#renderer = renderer;
     this.#now = now;
+    this.#wait = wait;
     this.#options = { ...DEFAULT_SIGN_QUEUE_OPTIONS, ...options };
     this.#speed = this.#options.baseSpeed;
     this.#secondsPerSign = this.#options.secondsPerSign;
@@ -126,6 +137,7 @@ export class SignQueue extends Emitter<SignQueueEvents> {
   clear(): void {
     this.#pending = [];
     this.#generation++;
+    this.#wake?.();
     this.#renderer.stop();
     this.#emitState();
   }
@@ -145,9 +157,15 @@ export class SignQueue extends Emitter<SignQueueEvents> {
     this.#secondsPerSign += (observed - this.#secondsPerSign) * ADAPT_WEIGHT;
   }
 
-  /** Atraso total medido em segundos de sinalização na velocidade 1. */
+  /**
+   * Atraso total medido em segundos de sinalização na velocidade 1. Itens com
+   * horário marcado no futuro não contam: eles não estão atrasados.
+   */
   #nominalLag(): number {
-    let lag = this.#pending.reduce((sum, item) => sum + this.#estimate(item), 0);
+    const now = this.#now();
+    let lag = this.#pending
+      .filter((item) => (item.notBefore ?? 0) <= now)
+      .reduce((sum, item) => sum + this.#estimate(item), 0);
     if (this.#current) {
       const played = (this.#now() - this.#currentStartedAt) * this.#speed;
       lag += Math.max(0, this.#estimate(this.#current) - played);
@@ -165,7 +183,12 @@ export class SignQueue extends Emitter<SignQueueEvents> {
 
   #dropExcess(): void {
     const dropped: SignItem[] = [];
-    while (this.#pending.length > 1 && this.#nominalLag() > this.#options.maxLagSeconds) {
+    const now = this.#now();
+    while (
+      this.#pending.length > 1 &&
+      (this.#pending[0]?.notBefore ?? 0) <= now &&
+      this.#nominalLag() > this.#options.maxLagSeconds
+    ) {
       const item = this.#pending.shift();
       if (item) dropped.push(item);
     }
@@ -178,8 +201,25 @@ export class SignQueue extends Emitter<SignQueueEvents> {
     if (this.#draining) return;
     this.#draining = true;
     try {
-      let item = this.#pending.shift();
+      let item = this.#pending[0];
       while (item) {
+        const wait = (item.notBefore ?? 0) - this.#now();
+        if (wait > 0) {
+          // Fica na fila (e conta no estado) até a hora marcada.
+          const generation = this.#generation;
+          await Promise.race([
+            this.#wait(wait),
+            new Promise<void>((resolve) => {
+              this.#wake = resolve;
+            }),
+          ]);
+          this.#wake = undefined;
+          if (generation !== this.#generation) {
+            item = this.#pending[0];
+            continue;
+          }
+        }
+        this.#pending.shift();
         const speed = this.#speedFor(this.#nominalLag() + this.#estimate(item));
         if (speed !== this.#speed) {
           this.#speed = speed;
@@ -201,7 +241,7 @@ export class SignQueue extends Emitter<SignQueueEvents> {
         this.#current = null;
         this.emit("end", item);
         this.#emitState();
-        item = this.#pending.shift();
+        item = this.#pending[0];
       }
     } finally {
       this.#draining = false;

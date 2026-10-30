@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import threading
@@ -16,6 +17,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from autolibras_stt.config import Settings
 from autolibras_stt.server import create_app
+from autolibras_stt.sessions import AudioClock
 from autolibras_stt.vad import energy_vad
 
 SPEECH = np.concatenate([silence(0.5), tone(1.5), silence(1), tone(1), silence(1)])
@@ -225,3 +227,124 @@ def test_sessao_parada_e_encerrada_avisando_o_overlay(tmp_path: Path) -> None:
             with pytest.raises(WebSocketDisconnect):
                 overlay.receive_json()
         assert client.get(f"/v1/sessions/{old['id']}").status_code == 404
+
+
+def test_finais_trazem_o_horario_da_fala_e_a_latencia(tmp_path: Path) -> None:
+    with make_client(tmp_path) as client:
+        created = client.post("/v1/sessions", json={"source": {"type": "audio"}}).json()
+        with (
+            client.websocket_connect(created["events"]) as overlay,
+            client.websocket_connect(created["ingest"]) as studio,
+        ):
+            hello = overlay.receive_json()
+            assert hello["serverTime"] > 0
+            studio.receive_json()
+            for chunk in chunks(SPEECH):
+                studio.send_bytes(chunk)
+            final = collect(overlay, "final")[-1]
+        assert final["wallStart"] < final["wallEnd"] <= final["serverTime"]
+        # No teste o áudio chega todo de uma vez, então a fala "começou" há pouco.
+        assert final["serverTime"] - final["wallStart"] < 5
+        latency = client.get(f"/v1/sessions/{created['id']}").json()["latency"]
+        assert latency["count"] >= 1
+        assert latency["recommendedDelay"] >= 1
+
+
+def test_sessao_de_texto_recebe_legendas(tmp_path: Path) -> None:
+    with make_client(tmp_path, token="segredo") as client:
+        headers = {"Authorization": "Bearer segredo"}
+        created = client.post(
+            "/v1/sessions", json={"source": {"type": "text"}}, headers=headers
+        ).json()
+        with client.websocket_connect(created["events"]) as overlay:
+            overlay.receive_json()
+            assert client.post(created["text"], json={"text": "Boa"}).status_code == 401
+            client.post(created["text"], json={"text": "Boa", "final": False}, headers=headers)
+            client.post(created["text"], json={"text": " Boa  noite. "}, headers=headers)
+            assert overlay.receive_json()["state"] == "live"
+            assert overlay.receive_json() == {
+                "type": "partial",
+                "id": "t1",
+                "text": "Boa",
+                "stable": "",
+            }
+            final = overlay.receive_json()
+            assert (final["type"], final["id"], final["text"]) == ("final", "t1", "Boa noite.")
+            with client.websocket_connect(f"{created['ingest']}?token=segredo") as typist:
+                typist.receive_json()
+                typist.send_json({"type": "text", "text": "Tudo bem?"})
+                assert typist.receive_json()["id"] == "t2"
+                assert overlay.receive_json()["text"] == "Tudo bem?"
+
+
+def test_relogio_do_audio_usa_a_chegada_mais_cedo_da_janela() -> None:
+    now = [1000.0]
+    clock = AudioClock(window_s=10, now=lambda: now[0])
+    assert clock.wall(1) is None
+    clock.observe(1.0)  # 1 s de áudio chegou em 1000,0: começou em 999,0
+    now[0] = 1002.5
+    clock.observe(2.0)  # chegou atrasado: daria 1000,5
+    assert clock.wall(0) == 999.0
+    # O envio parou 20 s e o áudio desse tempo se perdeu: a janela esquece o começo.
+    now[0] = 1030.0
+    clock.observe(3.0)
+    assert clock.wall(3.0) == 1030.0
+
+
+def test_sessao_le_a_legenda_do_hls(tmp_path: Path) -> None:
+    (tmp_path / "master.m3u8").write_text(
+        "#EXTM3U\n"
+        '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="s",LANGUAGE="pt",URI="subs.m3u8"\n'
+        '#EXT-X-STREAM-INF:BANDWIDTH=1,SUBTITLES="s"\nvideo.m3u8\n'
+    )
+    (tmp_path / "subs.m3u8").write_text(
+        "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\nseg0.vtt\n#EXT-X-ENDLIST\n"
+    )
+    (tmp_path / "seg0.vtt").write_text(
+        "WEBVTT\n\n00:00:00.500 --> 00:00:02.000\nBoa noite a todos.\n\n"
+        "00:00:02.000 --> 00:00:03.000\nAté amanhã\n"
+    )
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0), partial(SimpleHTTPRequestHandler, directory=str(tmp_path))
+    )
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with make_client(tmp_path) as client:
+            url = f"http://127.0.0.1:{server.server_port}/master.m3u8"
+            source = {"type": "url", "url": url, "captions": True}
+            created = client.post("/v1/sessions", json={"source": source}).json()
+            assert created["captions"] is True
+            with client.websocket_connect(created["events"]) as overlay:
+                seen = collect(overlay, "ended")
+            finals = [m["text"] for m in seen if m["type"] == "final"]
+            assert finals == ["Boa noite a todos.", "Até amanhã"]
+    finally:
+        server.shutdown()
+
+
+CC_SAMPLE = os.environ.get("AUTOLIBRAS_CC_SAMPLE", "")
+
+
+@pytest.mark.skipif(
+    not (CC_SAMPLE and shutil.which("ffmpeg")),
+    reason="defina AUTOLIBRAS_CC_SAMPLE com um vídeo com closed caption",
+)
+def test_le_o_closed_caption_embutido_no_video(tmp_path: Path) -> None:
+    sample = Path(CC_SAMPLE)
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0), partial(SimpleHTTPRequestHandler, directory=str(sample.parent))
+    )
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        app = create_app(FakeEngine(), energy_vad(), Settings(), ffmpeg="ffmpeg")
+        with TestClient(app) as client:
+            url = f"http://127.0.0.1:{server.server_port}/{sample.name}"
+            source = {"type": "url", "url": url, "captions": True}
+            created = client.post("/v1/sessions", json={"source": source}).json()
+            with client.websocket_connect(created["events"]) as overlay:
+                seen = collect(overlay, "ended", limit=2_000)
+        finals = [m["text"] for m in seen if m["type"] == "final"]
+        assert finals, seen[-3:]
+        assert all("inaudible" not in text and ">>" not in text for text in finals)
+    finally:
+        server.shutdown()

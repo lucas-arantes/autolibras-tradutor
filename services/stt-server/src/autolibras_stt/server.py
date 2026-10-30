@@ -7,6 +7,7 @@ import fnmatch
 import json
 import logging
 import secrets
+import time
 from pathlib import Path
 from typing import Any, Literal
 
@@ -14,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 from . import protocol
@@ -31,10 +32,18 @@ MAX_CHUNK_BYTES = 10 * protocol.SAMPLE_RATE * 2
 
 
 class SourceRequest(BaseModel):
-    type: Literal["audio", "url"]
+    type: Literal["audio", "url", "text"]
     url: str | None = None
     # Vídeo gravado: o ffmpeg lê na velocidade real, como se fosse ao vivo.
     realtime: bool = False
+    # Usa a legenda WebVTT da transmissão HLS em vez de reconhecer a fala.
+    captions: bool = False
+
+
+class TextRequest(BaseModel):
+    text: str = Field(max_length=2_000)
+    # Falso: só atualiza a legenda (texto ainda sendo digitado ou legenda em rolagem).
+    final: bool = True
 
 
 class SessionRequest(BaseModel):
@@ -164,12 +173,19 @@ def create_app(
             await hub.delete(body.id)
         try:
             session = hub.create(
-                body.source.type, body.source.url, body.source.realtime, session_id=body.id
+                body.source.type,
+                body.source.url,
+                body.source.realtime,
+                session_id=body.id,
+                captions=body.source.captions,
             )
         except SessionError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        links = {"events": f"/v1/sessions/{session.id}/events"}
-        if session.source == "audio":
+        links = {
+            "events": f"/v1/sessions/{session.id}/events",
+            "text": f"/v1/sessions/{session.id}/text",
+        }
+        if session.source in ("audio", "text"):
             links["ingest"] = f"/v1/sessions/{session.id}/ingest"
         return {**session.info(), **links}
 
@@ -190,17 +206,25 @@ def create_app(
             raise HTTPException(status_code=404, detail="Sessão não encontrada")
         return Response(status_code=204)
 
+    @app.post("/v1/sessions/{session_id}/text")
+    async def post_text(session_id: str, body: TextRequest, request: Request) -> dict[str, Any]:
+        """Texto pronto (legenda, estenotipia, digitação) entra como frase da sessão."""
+        require_token(request)
+        message = hub.text(find(session_id), body.text, body.final)
+        return message or {}
+
     @app.websocket("/v1/sessions/{session_id}/ingest")
     async def ingest(websocket: WebSocket, session_id: str) -> None:
-        """Mesmo protocolo de /v1/stream; os eventos também vão para os assinantes."""
+        """Mesmo protocolo de /v1/stream, mais `{"type": "text"}`; os eventos também vão
+        para os assinantes."""
         if not await accept(websocket):
             return
         if not authorized(None, websocket.query_params.get("token")):
             await websocket.close(code=1008, reason="Token inválido ou ausente")
             return
         session = hub.get(session_id)
-        if not session or session.source != "audio":
-            await websocket.close(code=1008, reason="Sessão de áudio não encontrada")
+        if not session or session.source == "url":
+            await websocket.close(code=1008, reason="Sessão de áudio ou texto não encontrada")
             return
         if session.ingest_connected:
             await websocket.close(code=1013, reason="A sessão já recebe áudio de outra conexão")
@@ -218,11 +242,19 @@ def create_app(
                         await websocket.send_json(protocol.error("Áudio inválido: use PCM 16 bits"))
                         continue
                     for event in await hub.feed(session, data):
-                        await websocket.send_json(event.to_json())
+                        await websocket.send_json(event)
                     continue
-                if _command(message) == "stop":
+                command = _json(message)
+                if command.get("type") == "text" and isinstance(command.get("text"), str):
+                    sent = hub.text(
+                        session, command["text"][:2_000], command.get("final") is not False
+                    )
+                    if sent:
+                        await websocket.send_json(sent)
+                    continue
+                if command.get("type") == "stop":
                     for event in await hub.flush(session):
-                        await websocket.send_json(event.to_json())
+                        await websocket.send_json(event)
                     await websocket.send_json(protocol.STOPPED)
                     await websocket.close()
                     return
@@ -244,7 +276,9 @@ def create_app(
             await websocket.close(code=1008, reason="Sessão não encontrada")
             return
         queue = hub.subscribe(session)
-        await websocket.send_json({"type": "session", **session.info()})
+        await websocket.send_json(
+            {"type": "session", **session.info(), "serverTime": round(time.time(), 3)}
+        )
         receiver = asyncio.create_task(_drain(websocket))
         try:
             while not receiver.done():
@@ -277,12 +311,16 @@ def create_app(
     return app
 
 
-def _command(message: dict[str, Any]) -> str | None:
+def _json(message: dict[str, Any]) -> dict[str, Any]:
     try:
         data = json.loads(message.get("text") or "{}")
     except json.JSONDecodeError:
-        return None
-    return data.get("type") if isinstance(data, dict) else None
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _command(message: dict[str, Any]) -> str | None:
+    return _json(message).get("type")
 
 
 async def _drain(websocket: WebSocket) -> None:

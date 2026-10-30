@@ -31,6 +31,7 @@ O servidor em `services/stt-server` instala estas dependências pelo pip. O mode
 | FastAPI | Servidor HTTP e WebSocket | MIT |
 | Uvicorn | Servidor ASGI | BSD-3-Clause |
 | NumPy | Processamento do áudio | BSD-3-Clause |
+| [FFmpeg](https://ffmpeg.org/) | Leitura de transmissões RTMP, SRT e HLS nas sessões por endereço. É um programa à parte, que o servidor chama; a imagem Docker o instala do Debian ao ser montada | LGPL-2.1-or-later, com partes GPL no pacote do Debian |
 
 ## Modelo do avatar próprio
 

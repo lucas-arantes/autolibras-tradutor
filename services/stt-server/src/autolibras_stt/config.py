@@ -31,6 +31,12 @@ class Settings:
     )
     # Transcrições simultâneas. Em CPU, mais de uma só divide o mesmo processador.
     max_concurrency: int = 1
+    # Sessões de transmissão ao mesmo tempo.
+    max_sessions: int = 4
+    # Se definido, criar, listar e encerrar sessões e enviar áudio exigem este token.
+    token: str = ""
+    # Pasta com o build do app web, servido pelo próprio servidor (overlay do OBS).
+    web_dir: str = ""
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -46,11 +52,17 @@ class Settings:
                 o.strip() for o in _env("ALLOWED_ORIGINS", DEFAULT_ORIGINS).split(",") if o.strip()
             ),
             max_concurrency=int(_env("MAX_CONCURRENCY", "1")),
+            max_sessions=int(_env("MAX_SESSIONS", "4")),
+            token=_env("TOKEN", ""),
+            web_dir=_env("WEB_DIR", ""),
         )
 
-    def origin_allowed(self, origin: str | None) -> bool:
+    def origin_allowed(self, origin: str | None, host: str | None = None) -> bool:
         # Clientes fora do navegador não mandam Origin e não são o risco aqui:
         # a checagem impede que qualquer site use o servidor pelo navegador do visitante.
         if origin is None:
+            return True
+        # Páginas servidas pelo próprio servidor (o overlay, acessado por localhost ou pelo IP).
+        if host and origin.split("://", 1)[-1] == host:
             return True
         return any(pattern == "*" or fnmatch(origin, pattern) for pattern in self.allowed_origins)

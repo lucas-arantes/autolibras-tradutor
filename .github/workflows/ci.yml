@@ -42,7 +42,9 @@ jobs:
       - run: ruff format --check src tests
       # Os testes de integração (modelo Whisper real) ficam de fora: pedem AUTOLIBRAS_INTEGRATION=1.
       - run: pytest -q
-      - run: docker build -t autolibras-stt .
+      # A imagem leva o app web junto, então o contexto é a raiz do repositório.
+      - run: docker build -t autolibras .
+        working-directory: .
 
   # Publica o app no GitHub Pages depois que as verificações passam no main.
   deploy:

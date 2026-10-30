@@ -8,8 +8,14 @@ export default defineConfig({
     // O worklet de captura sai como arquivo, para funcionar também sob CSP restritiva.
     assetsInlineLimit: (file) => (file.endsWith("capture-worklet.js") ? false : undefined),
     rollupOptions: {
-      // `player.html` é o avatar sozinho, embutido pela extensão do navegador.
-      input: { main: "index.html", player: "player.html" },
+      // `player.html` é o avatar sozinho, embutido pela extensão do navegador;
+      // `studio.html` e `broadcast.html` são o Estúdio e o overlay para o OBS.
+      input: {
+        main: "index.html",
+        player: "player.html",
+        studio: "studio.html",
+        broadcast: "broadcast.html",
+      },
     },
   },
 });

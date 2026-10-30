@@ -29,7 +29,14 @@ def receive_until(ws, kind: str, limit: int = 50) -> list[dict]:  # noqa: ANN001
 
 
 def test_health(client: TestClient) -> None:
-    assert client.get("/health").json() == {"status": "ok", "model": "fake", "language": "pt"}
+    assert client.get("/health").json() == {
+        "status": "ok",
+        "model": "fake",
+        "language": "pt",
+        "sessions": 0,
+        "tokenRequired": False,
+        "web": False,
+    }
 
 
 def test_fluxo_completo(client: TestClient) -> None:

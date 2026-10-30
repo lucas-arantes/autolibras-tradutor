@@ -1,0 +1,22 @@
+# Sobe o AutoLibras para transmissões: `docker compose up -d` e abra
+# http://localhost:8000/studio.html. Veja docs/transmissoes-obs.md.
+services:
+  autolibras:
+    build: .
+    image: autolibras
+    restart: unless-stopped
+    ports:
+      # Só este computador acessa. Para abrir o Estúdio de outro computador da
+      # rede, troque por "8000:8000" e defina AUTOLIBRAS_TOKEN.
+      - "127.0.0.1:8000:8000"
+    environment:
+      # small roda bem em CPU; base é mais rápido, medium é mais preciso.
+      AUTOLIBRAS_MODEL: ${AUTOLIBRAS_MODEL:-small}
+      # Senha para criar sessões e enviar áudio. Vazio: sem senha.
+      AUTOLIBRAS_TOKEN: ${AUTOLIBRAS_TOKEN:-}
+      AUTOLIBRAS_MAX_SESSIONS: ${AUTOLIBRAS_MAX_SESSIONS:-4}
+    volumes:
+      - models:/models
+
+volumes:
+  models:

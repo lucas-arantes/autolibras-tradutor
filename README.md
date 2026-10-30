@@ -2,7 +2,7 @@
 
 O AutoLibras Tradutor ouve português falado e mostra a tradução em Libras (Língua Brasileira de Sinais) com um avatar 3D, enquanto a pessoa fala. A fala vira texto, o texto vira glosa de Libras e o avatar sinaliza a glosa.
 
-O projeto está no começo. Por enquanto existem a versão web, publicada em https://lucas-arantes.github.io/autolibras-tradutor/, uma extensão do Chrome que traduz o áudio de outras abas (YouTube, Meet) e um servidor de transcrição opcional. Para falar em vez de digitar, use Chrome, Edge ou Safari, ou rode o servidor.
+O projeto está no começo. Por enquanto existem a versão web, publicada em https://lucas-arantes.github.io/autolibras-tradutor/, uma extensão do Chrome que traduz o áudio de outras abas (YouTube, Meet), um servidor de transcrição opcional e um overlay para pôr o avatar em transmissões ao vivo pelo OBS. Para falar em vez de digitar, use Chrome, Edge ou Safari, ou rode o servidor.
 
 ## Como funciona
 
@@ -21,6 +21,18 @@ A fala costuma ser mais rápida que a sinalização, então as frases passam por
 Também é possível digitar o texto. Isso funciona em qualquer navegador, mesmo sem microfone.
 
 A [extensão do Chrome](apps/extension/README.md) faz o mesmo com o áudio de uma aba, como um vídeo ou uma reunião, e mostra a legenda e o avatar sobre a página.
+
+## Transmissões ao vivo
+
+Com o Docker, um comando sobe o servidor de transcrição junto com o Estúdio e o overlay:
+
+```bash
+docker compose up -d
+```
+
+No Estúdio (http://localhost:8000/studio.html), você escolhe de onde vem o áudio: um dispositivo do computador (microfone, mesa de som, cabo virtual) ou o endereço da transmissão (RTMP, SRT ou HLS), que o servidor lê com o ffmpeg. O Estúdio mostra o endereço do overlay, que entra no OBS como fonte de navegador. O endereço não muda de uma live para outra. O passo a passo está em [Libras na sua live com o OBS](docs/transmissoes-obs.md).
+
+Por enquanto o overlay usa o avatar do VLibras, cujos termos de uso não autorizam tradução automática em produções audiovisuais, e o player dele tem fundo opaco. O overlay serve para testes e demonstrações até o avatar próprio ficar pronto.
 
 ## Como rodar
 
@@ -44,6 +56,7 @@ Abra http://localhost:5173. O avatar precisa de WebGL e leva alguns segundos par
 | `npm run typecheck` | TypeScript e svelte-check |
 | `npm run lint` | Lint e formatação (Biome) |
 | `npm run dev -w @autolibras/avatar-three` | Demo do avatar próprio |
+| `docker compose up -d` | Servidor de transcrição com o app, o Estúdio e o overlay em http://localhost:8000 |
 
 ## Estrutura
 
@@ -51,14 +64,15 @@ Abra http://localhost:5173. O avatar precisa de WebGL e leva alguns segundos par
 packages/
   core/          Interfaces (reconhecedor, tradutor, avatar), Pipeline, SignQueue, FallbackTranslator
   gloss-rules/   Tradutor PT→glosa por regras (verbos, plurais, números, expressões), com ou sem o dicionário de sinais
-  stt-web/       Reconhecimento de fala: Web Speech API e cliente do servidor Whisper
+  stt-web/       Reconhecimento de fala: Web Speech API, cliente do servidor Whisper e das sessões de transmissão
   vlibras/       Adaptadores do VLibras: API de tradução, avatar do Widget, proteção contra captura de cliques
   avatar-three/  Avatar próprio em VRM (three.js), em desenvolvimento e ainda fora do app
 apps/
-  web/           PWA em Svelte 5 + Vite (inclui player.html, o avatar sozinho usado pela extensão)
+  web/           PWA em Svelte 5 + Vite. Também tem player.html (o avatar sozinho, usado pela extensão),
+                 studio.html (Estúdio de transmissão) e broadcast.html (overlay do OBS)
   extension/     Extensão do Chrome (Manifest V3) que traduz o áudio de uma aba
 services/
-  stt-server/    Servidor de transcrição em Python (Whisper, VAD, WebSocket)
+  stt-server/    Servidor de transcrição em Python (Whisper, VAD, WebSocket, sessões de transmissão)
 ```
 
 Cada etapa implementa uma interface definida em `@autolibras/core`. Por isso dá para trocar o reconhecedor de fala, o tradutor ou o avatar sem mexer nas outras etapas. O [avatar próprio](packages/avatar-three/README.md) usa essa mesma interface e vai substituir o do VLibras quando estiver pronto.

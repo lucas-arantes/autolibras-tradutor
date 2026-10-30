@@ -9,7 +9,7 @@ export interface SocketLike {
   onopen: (() => void) | null;
   onmessage: ((event: { data: unknown }) => void) | null;
   onerror: (() => void) | null;
-  onclose: (() => void) | null;
+  onclose: ((event?: { code?: number }) => void) | null;
   send(data: string | ArrayBufferLike): void;
   close(): void;
 }

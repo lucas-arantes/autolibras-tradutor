@@ -1,0 +1,17 @@
+# Só o código entra no contexto de build: nada de dependências, builds ou dados locais.
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/*.egg-info
+**/tests
+**/*.test.ts
+.git
+.github
+.claude
+docs
+packages/avatar-three/demo/public/signs
+**/.env
+**/.env.*

@@ -64,6 +64,7 @@ Tudo é configurado por variáveis de ambiente.
 | `AUTOLIBRAS_MAX_SESSIONS` | `4` | Quantas sessões de transmissão podem existir ao mesmo tempo |
 | `AUTOLIBRAS_TOKEN` | vazio | Senha para criar, listar e apagar sessões e para enviar áudio a elas. Vazio: sem senha. Defina sempre que o servidor estiver acessível pela rede |
 | `AUTOLIBRAS_WEB_DIR` | vazio (`/app/web` no Docker) | Pasta com o build do app web, servida na raiz |
+| `AUTOLIBRAS_SIGNS_DIR` | vazio (`/signs` no Docker Compose) | Pacote de sinais do avatar próprio (pasta com `manifest.json`), servido em `/signs/` |
 
 ## Desempenho
 

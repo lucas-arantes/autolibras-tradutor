@@ -1,7 +1,10 @@
 /** Estado e chamadas à API de sessões usados pela página Estúdio. */
 import type { VLibrasAvatar } from "@autolibras/vlibras";
+import { SIGN_PACK_URL } from "./avatar";
 
 export type StudioSource = "audio" | "url";
+/** Avatar do overlay: o próprio do AutoLibras ou um personagem do VLibras. */
+export type StudioAvatar = "propio" | VLibrasAvatar;
 
 export interface StudioSettings {
   /** Endereço do servidor (`services/stt-server`), por exemplo `http://localhost:8000`. */
@@ -14,7 +17,9 @@ export interface StudioSettings {
   streamUrl: string;
   /** Vídeo gravado: o servidor lê na velocidade real. */
   realtime: boolean;
-  avatar: VLibrasAvatar;
+  avatar: StudioAvatar;
+  /** Pacote de sinais do avatar próprio. Vazio: o do servidor, se houver, ou o do build. */
+  signsUrl: string;
   caption: boolean;
 }
 
@@ -23,6 +28,8 @@ export interface ServerHealth {
   tokenRequired: boolean;
   /** O servidor também serve o app (imagem Docker): o overlay sai dele. */
   web: boolean;
+  /** O servidor serve um pacote de sinais do avatar próprio em `/signs/`. */
+  signs: boolean;
 }
 
 export interface SessionInfo {
@@ -53,7 +60,8 @@ export function defaultSettings(origin: string, servedByServer: boolean): Studio
     deviceId: "",
     streamUrl: "",
     realtime: false,
-    avatar: "icaro",
+    avatar: "propio",
+    signsUrl: "",
     caption: false,
   };
 }
@@ -79,18 +87,35 @@ function base(server: string): string {
   return server.endsWith("/") ? server : `${server}/`;
 }
 
+/** Pacote de sinais que o overlay vai usar, ou vazio se não houver nenhum. */
+export function signPackFor(
+  settings: Pick<StudioSettings, "server" | "signsUrl">,
+  server: Pick<ServerHealth, "signs"> | null,
+  buildPack: string = SIGN_PACK_URL,
+): string {
+  if (settings.signsUrl.trim()) return settings.signsUrl.trim();
+  if (server?.signs) return new URL("signs/", base(settings.server)).toString();
+  return buildPack;
+}
+
 /** Endereço para colar no OBS. */
 export function overlayUrl(
-  settings: Pick<StudioSettings, "server" | "sessionId" | "avatar" | "caption">,
+  settings: Pick<StudioSettings, "server" | "sessionId" | "avatar" | "signsUrl" | "caption">,
   pageBase: string,
-  servedByServer: boolean,
+  server: Pick<ServerHealth, "web" | "signs"> | null,
+  buildPack: string = SIGN_PACK_URL,
 ): string {
   // O overlay deve vir do próprio servidor sempre que possível: assim o OBS não
   // esbarra em bloqueio de conteúdo misto nem de acesso à rede local.
-  const url = new URL("broadcast.html", servedByServer ? base(settings.server) : pageBase);
+  const served = server?.web ?? false;
+  const url = new URL("broadcast.html", served ? base(settings.server) : pageBase);
   url.searchParams.set("session", settings.sessionId);
-  if (!servedByServer) url.searchParams.set("server", settings.server);
-  if (settings.avatar !== "icaro") url.searchParams.set("avatar", settings.avatar);
+  if (!served) url.searchParams.set("server", settings.server);
+  url.searchParams.set("avatar", settings.avatar);
+  if (settings.avatar === "propio") {
+    const signs = signPackFor(settings, server, buildPack);
+    if (signs && signs !== buildPack) url.searchParams.set("signs", signs);
+  }
   if (settings.caption) url.searchParams.set("legenda", "1");
   return url.toString();
 }

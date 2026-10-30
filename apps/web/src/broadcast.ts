@@ -7,7 +7,12 @@
  * Parâmetros da URL:
  * - `session` (obrigatório): id da sessão, mostrado no Estúdio;
  * - `server`: endereço do servidor; padrão, o próprio endereço desta página;
- * - `translator=vlibras|regras` e `avatar=icaro|hosana|guga`, como no player;
+ * - `avatar=propio|vlibras`, ou um personagem do VLibras (`icaro`, `hosana`, `guga`).
+ *   Sem ele, vale o avatar próprio se houver pacote de sinais, senão o VLibras;
+ * - `signs=URL`: pacote de sinais do avatar próprio (padrão: o definido no build);
+ * - `bg=transparent` ou uma cor CSS: fundo do avatar próprio (padrão: transparente);
+ * - `translator=vlibras|regras`. Padrão: regras locais com o avatar próprio, para a
+ *   live não depender dos serviços do VLibras; tradutor do VLibras com o avatar dele;
  * - `legenda=1`: mostra a frase que está sendo sinalizada;
  * - `status=1`: mostra o estado da conexão (útil ao configurar; some quando tudo vai bem).
  */
@@ -18,8 +23,8 @@ import {
   loadVLibrasVocabulary,
   VLibrasApiTranslator,
   type VLibrasAvatar,
-  VLibrasWidgetRenderer,
 } from "@autolibras/vlibras";
+import { createAvatar, defaultAvatarKind, parseAvatarKind, SIGN_PACK_URL } from "./lib/avatar";
 
 const AVATARS: readonly VLibrasAvatar[] = ["icaro", "hosana", "guga"];
 
@@ -44,18 +49,40 @@ if (!sessionId) {
   throw new Error("Overlay sem sessão");
 }
 
+const avatarParam = params.get("avatar");
+const persona = AVATARS.find((a) => a === avatarParam);
+const signsUrl = params.get("signs")?.trim() || SIGN_PACK_URL;
+const kind = persona ? "vlibras" : (parseAvatarKind(avatarParam) ?? defaultAvatarKind(signsUrl));
+
 const rules = new RulesTranslator();
 loadVLibrasVocabulary()
   .then((vocabulary) => rules.setVocabulary(vocabulary))
   .catch(() => undefined);
+const translatorParam = params.get("translator") ?? (kind === "propio" ? "regras" : "vlibras");
 const translator =
-  params.get("translator") === "regras"
+  translatorParam === "regras"
     ? rules
     : new FallbackTranslator([new VLibrasApiTranslator(), rules]);
-const avatarParam = params.get("avatar") as VLibrasAvatar | null;
-const renderer = new VLibrasWidgetRenderer({
-  avatar: avatarParam && AVATARS.includes(avatarParam) ? avatarParam : "icaro",
+
+setStatus(
+  kind === "propio" ? "Carregando o avatar e o pacote de sinais…" : "Carregando o avatar…",
+  true,
+);
+const bg = params.get("bg");
+const avatar = await createAvatar(kind, {
+  vlibrasAvatar: persona ?? "icaro",
+  signsUrl,
+  background: !bg || bg === "transparent" ? null : bg,
+}).catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  setStatus(`Não foi possível carregar o avatar: ${message}`, true);
+  throw error;
 });
+if (avatar.canvas) {
+  avatar.canvas.id = "avatar";
+  document.body.prepend(avatar.canvas);
+}
+const { renderer } = avatar;
 const pipeline = new Pipeline({ translator, renderer });
 const recognizer = new SessionRecognizer({
   server: params.get("server") || location.origin,
@@ -113,11 +140,10 @@ function compactVLibrasWidget(): void {
   shadow.append(style);
 }
 
-setStatus("Carregando o avatar…", true);
 renderer
   .load()
   .then(() => {
-    compactVLibrasWidget();
+    if (kind === "vlibras") compactVLibrasWidget();
     loaded = true;
     setStatus("");
     recognizer.start();

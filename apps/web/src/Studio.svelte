@@ -1,6 +1,5 @@
 <script lang="ts">
 import { captureStream, RemoteWhisperRecognizer } from "@autolibras/stt-web";
-import type { VLibrasAvatar } from "@autolibras/vlibras";
 import { onDestroy } from "svelte";
 import {
   ingestUrl,
@@ -9,8 +8,10 @@ import {
   type ServerHealth,
   SessionApi,
   type SessionInfo,
+  type StudioAvatar,
   type StudioSettings,
   saveStudioSettings,
+  signPackFor,
 } from "./lib/studio";
 
 let { initial, pageBase }: { initial: StudioSettings; pageBase: string } = $props();
@@ -30,14 +31,17 @@ let copied = $state(false);
 let recognizer: RemoteWhisperRecognizer | undefined;
 let poll: ReturnType<typeof setInterval> | undefined;
 
-const avatars: Array<{ value: VLibrasAvatar; label: string }> = [
-  { value: "icaro", label: "Ícaro" },
-  { value: "hosana", label: "Hosana" },
-  { value: "guga", label: "Guga" },
+const avatars: Array<{ value: StudioAvatar; label: string }> = [
+  { value: "propio", label: "Avatar próprio" },
+  { value: "icaro", label: "VLibras: Ícaro" },
+  { value: "hosana", label: "VLibras: Hosana" },
+  { value: "guga", label: "VLibras: Guga" },
 ];
 
 const api = $derived(new SessionApi(settings.server.trim(), settings.token.trim()));
-const overlay = $derived(overlayUrl(settings, pageBase, health?.web ?? false));
+const overlay = $derived(overlayUrl(settings, pageBase, health));
+const signPack = $derived(signPackFor(settings, health));
+const ownAvatar = $derived(settings.avatar === "propio");
 
 $effect(() => saveStudioSettings($state.snapshot(settings)));
 
@@ -300,9 +304,36 @@ onDestroy(() => {
         </label>
         <a href={`${overlay}&status=1`} target="_blank" rel="noopener">Abrir prévia</a>
       </div>
+      {#if ownAvatar}
+        <label class="field">
+          <span>Pacote de sinais</span>
+          <input
+            type="url"
+            bind:value={settings.signsUrl}
+            placeholder={signPack || "https://…/BR/ (pasta com manifest.json)"}
+            spellcheck="false"
+          />
+          <small class="muted">
+            {#if !signPack}
+              Nenhum pacote encontrado. Indique o endereço de um pacote publicado ou monte o seu e
+              aponte AUTOLIBRAS_SIGNS_DIR para ele no servidor.
+            {:else if !settings.signsUrl.trim()}
+              Em branco, usa {health?.signs ? "o pacote do servidor" : "o pacote padrão"}.
+            {/if}
+          </small>
+        </label>
+      {:else}
+        <p class="muted">
+          Os termos de uso do VLibras não autorizam tradução automática em produções audiovisuais.
+          Use o avatar do VLibras só para testes.
+        </p>
+      {/if}
       <ol class="steps">
         <li>No OBS, em <em>Fontes</em>, clique em <strong>+</strong> e escolha <em>Navegador</em>.</li>
-        <li>Cole o endereço acima em <em>URL</em>. Use largura 260 e altura 380.</li>
+        <li>
+          Cole o endereço acima em <em>URL</em>.
+          {ownAvatar ? "Use largura 400 e altura 600." : "Use largura 260 e altura 380."}
+        </li>
         <li>Arraste a fonte para um canto da cena e amplie pelas bordas, se quiser.</li>
       </ol>
       <p class="muted">

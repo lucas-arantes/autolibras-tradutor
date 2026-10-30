@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { defaultSettings, ingestUrl, newSessionId, overlayUrl, SessionApi } from "./studio";
+import {
+  defaultSettings,
+  ingestUrl,
+  newSessionId,
+  overlayUrl,
+  SessionApi,
+  signPackFor,
+} from "./studio";
 
 describe("Estúdio", () => {
   it("gera ids aceitos pelo servidor", () => {
@@ -10,10 +17,12 @@ describe("Estúdio", () => {
 
   it("monta o overlay no próprio servidor quando ele serve o app", () => {
     const settings = { ...defaultSettings("http://pc.local:8000", true), sessionId: "abc" };
-    expect(overlayUrl(settings, "https://site.test/app/", true)).toBe(
-      "http://pc.local:8000/broadcast.html?session=abc",
+    const server = { web: true, signs: true };
+    expect(overlayUrl(settings, "https://site.test/app/", server, "")).toBe(
+      "http://pc.local:8000/broadcast.html?session=abc&avatar=propio" +
+        "&signs=http%3A%2F%2Fpc.local%3A8000%2Fsigns%2F",
     );
-    expect(overlayUrl({ ...settings, avatar: "guga", caption: true }, "", true)).toBe(
+    expect(overlayUrl({ ...settings, avatar: "guga", caption: true }, "", server, "")).toBe(
       "http://pc.local:8000/broadcast.html?session=abc&avatar=guga&legenda=1",
     );
   });
@@ -21,9 +30,24 @@ describe("Estúdio", () => {
   it("aponta o overlay publicado para o servidor quando ele não serve o app", () => {
     const settings = { ...defaultSettings("https://site.test", false), sessionId: "abc" };
     expect(settings.server).toBe("http://localhost:8000");
-    expect(overlayUrl(settings, "https://site.test/app/", false)).toBe(
-      "https://site.test/app/broadcast.html?session=abc&server=http%3A%2F%2Flocalhost%3A8000",
+    expect(overlayUrl(settings, "https://site.test/app/", null, "https://cdn.test/BR/")).toBe(
+      "https://site.test/app/broadcast.html?session=abc" +
+        "&server=http%3A%2F%2Flocalhost%3A8000&avatar=propio",
     );
+  });
+
+  it("escolhe o pacote de sinais: o digitado, o do servidor ou o do build", () => {
+    const settings = { server: "http://pc.local:8000", signsUrl: "" };
+    expect(signPackFor(settings, { signs: true }, "https://cdn.test/BR/")).toBe(
+      "http://pc.local:8000/signs/",
+    );
+    expect(signPackFor(settings, { signs: false }, "https://cdn.test/BR/")).toBe(
+      "https://cdn.test/BR/",
+    );
+    expect(signPackFor({ ...settings, signsUrl: " https://x.test/ " }, null, "")).toBe(
+      "https://x.test/",
+    );
+    expect(signPackFor(settings, null, "")).toBe("");
   });
 
   it("leva o token na URL do áudio", () => {

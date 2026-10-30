@@ -37,6 +37,8 @@ class Settings:
     token: str = ""
     # Pasta com o build do app web, servido pelo próprio servidor (overlay do OBS).
     web_dir: str = ""
+    # Pacote de sinais do avatar próprio (pasta com manifest.json), servido em /signs/.
+    signs_dir: str = ""
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -55,6 +57,7 @@ class Settings:
             max_sessions=int(_env("MAX_SESSIONS", "4")),
             token=_env("TOKEN", ""),
             web_dir=_env("WEB_DIR", ""),
+            signs_dir=_env("SIGNS_DIR", ""),
         )
 
     def origin_allowed(self, origin: str | None, host: str | None = None) -> bool:

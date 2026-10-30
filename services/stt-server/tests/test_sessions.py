@@ -149,15 +149,21 @@ def test_aceita_paginas_servidas_pelo_proprio_servidor(tmp_path: Path) -> None:
             assert overlay.receive_json()["type"] == "session"
 
 
-def test_serve_o_app_web(tmp_path: Path) -> None:
+def test_serve_o_app_web_e_o_pacote_de_sinais(tmp_path: Path) -> None:
     web = tmp_path / "web"
     web.mkdir()
     (web / "index.html").write_text("<p>AutoLibras</p>")
     (web / "broadcast.html").write_text("<p>overlay</p>")
-    with make_client(tmp_path, web_dir=str(web)) as client:
+    signs = tmp_path / "sinais"
+    signs.mkdir()
+    (signs / "manifest.json").write_text('{"signs": {}}')
+    with make_client(tmp_path, web_dir=str(web), signs_dir=str(signs)) as client:
         assert "AutoLibras" in client.get("/").text
         assert "overlay" in client.get("/broadcast.html").text
-        assert client.get("/health").json()["web"] is True
+        assert client.get("/signs/manifest.json").json() == {"signs": {}}
+        health = client.get("/health").json()
+        assert health["web"] is True
+        assert health["signs"] is True
 
 
 @pytest.mark.skipif(not shutil.which("ffmpeg"), reason="sem ffmpeg")

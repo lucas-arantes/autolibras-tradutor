@@ -3,7 +3,7 @@
 Este guia põe o avatar do AutoLibras numa transmissão feita com o OBS Studio. O servidor do AutoLibras ouve o áudio da live, transcreve a fala e manda as frases para uma página que o OBS mostra como fonte de navegador. Funciona no Windows, no macOS e no Linux.
 
 > [!IMPORTANT]
-> Por enquanto, o avatar é o do VLibras. Os termos de uso do VLibras não autorizam tradução automática em produções audiovisuais, então use esta versão para testes e demonstrações. O player do VLibras também tem fundo cinza-claro, então o avatar aparece dentro de um retângulo. O avatar próprio do AutoLibras, que vai poder ir ao ar e terá fundo transparente, está em desenvolvimento.
+> Use o avatar próprio do AutoLibras na live. Ele tem fundo transparente e não depende dos serviços do VLibras. O Estúdio também oferece o avatar do VLibras, mas os termos de uso do VLibras não autorizam tradução automática em produções audiovisuais, então ele serve só para testes. O player do VLibras ainda tem fundo cinza-claro, e o avatar aparece dentro de um retângulo.
 
 > [!NOTE]
 > O avatar automático complementa o intérprete de Libras, mas não o substitui. Na TV, a lei exige a janela com intérprete (Lei 13.146/2015, art. 67).
@@ -12,12 +12,13 @@ Este guia põe o avatar do AutoLibras numa transmissão feita com o OBS Studio. 
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) no Windows ou no macOS. No Linux, o Docker Engine com o plugin `compose`.
 - [OBS Studio](https://obsproject.com/) 28 ou mais recente.
-- Internet: o avatar e o tradutor do VLibras são carregados dos servidores do governo.
+- O pacote de sinais do avatar próprio, uma pasta com um `manifest.json` e um arquivo por sinal. Os sinais são convertidos do dicionário aberto do VLibras (GPL-3.0) e ficam fora deste repositório. Ainda não há um pacote publicado: para montar o seu, siga [o README do avatar](../packages/avatar-three/README.md#pacote-de-sinais-gpl-30-fora-deste-repositório), que pede o Blender.
+- Internet, na primeira vez, para a lista de sinais que o tradutor local baixa do VLibras.
 - Espaço em disco para a imagem e para o modelo de reconhecimento de fala (o `small` tem cerca de 480 MB).
 
 ## 1. Suba o servidor
 
-Baixe o projeto (pelo botão **Code → Download ZIP** no GitHub ou com o `git`) e, na pasta dele, rode:
+Baixe o projeto (pelo botão **Code → Download ZIP** no GitHub ou com o `git`). Ponha o pacote de sinais numa pasta `sinais` dentro dele, com o `manifest.json` direto em `sinais/manifest.json`. Se o pacote estiver em outro lugar, indique o caminho em `AUTOLIBRAS_SIGNS`. Depois, na pasta do projeto, rode:
 
 ```bash
 docker compose up -d
@@ -42,20 +43,22 @@ Clique em **Iniciar tradução**. Quando alguém falar, a transcrição aparece 
 
 1. No Estúdio, em **Overlay no OBS**, clique em **Copiar**.
 2. No OBS, em **Fontes**, clique em **+** e escolha **Navegador**.
-3. Cole o endereço em **URL**. Use **Largura** 260 e **Altura** 380 e confirme.
+3. Cole o endereço em **URL**. Com o avatar próprio, use **Largura** 400 e **Altura** 600; com o do VLibras, 260 e 380. Confirme.
 4. Arraste a fonte para um canto da cena e amplie pelas bordas, se quiser.
 
 O endereço do overlay não muda de uma live para outra, então esta etapa é feita uma vez só. Para trocar o avatar ou mostrar a frase embaixo dele, mude as opções no Estúdio e copie o endereço de novo.
 
 ## 4. Teste
 
-Fale perto do microfone ou toque um vídeo. O avatar começa a sinalizar alguns segundos depois de cada frase: o servidor espera a pausa no fim da frase, transcreve, e o tradutor gera a glosa. Num teste em CPU com o modelo `small`, o primeiro sinal saiu cerca de 3 segundos depois do fim da fala. Quando a fala é rápida, as frases entram numa fila e o avatar acelera um pouco para não ficar para trás.
+Fale perto do microfone ou toque um vídeo. O avatar começa a sinalizar alguns segundos depois de cada frase: o servidor espera a pausa no fim da frase, transcreve, e o tradutor gera a glosa. Num teste em CPU com o modelo `small` e o avatar próprio, o primeiro sinal saiu cerca de 2 segundos depois do fim da fala; com o avatar e o tradutor do VLibras, cerca de 3 segundos. Quando a fala é rápida, as frases entram numa fila e o avatar acelera um pouco para não ficar para trás.
 
 Para encerrar, clique em **Parar** no Estúdio. O avatar para de sinalizar e volta a funcionar sozinho na próxima vez que você iniciar, sem mexer no OBS.
 
 ## Problemas comuns
 
-**O overlay não mostra nada.** Acrescente `&status=1` ao fim do endereço do overlay, na fonte do OBS, para ver o estado da conexão. "A sessão ainda não começou" quer dizer que falta clicar em **Iniciar tradução** no Estúdio.
+**O overlay não mostra nada.** Acrescente `&status=1` ao fim do endereço do overlay, na fonte do OBS, para ver o estado da conexão. "A sessão ainda não começou" quer dizer que falta clicar em **Iniciar tradução** no Estúdio. "Pacote de sinais não configurado" quer dizer que o servidor não achou `sinais/manifest.json`: confira a pasta e rode `docker compose up -d` de novo.
+
+**Uma palavra sai soletrada.** O sinal dela não está no pacote, então o avatar faz a datilologia. O dicionário inteiro do VLibras tem cerca de 23 mil sinais; um pacote menor soletra mais palavras.
 
 **O avatar fica muito atrás da fala.** O computador não está dando conta do modelo. Use um modelo menor: pare o servidor e suba de novo com `AUTOLIBRAS_MODEL=base docker compose up -d`. Fechar programas pesados também ajuda.
 

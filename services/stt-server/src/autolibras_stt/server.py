@@ -94,6 +94,9 @@ def create_app(
         return True
 
     web_served = bool(settings.web_dir) and Path(settings.web_dir).is_dir()
+    signs_served = (
+        bool(settings.signs_dir) and (Path(settings.signs_dir) / "manifest.json").is_file()
+    )
 
     @app.get("/health")
     async def health() -> dict[str, Any]:
@@ -104,6 +107,7 @@ def create_app(
             "sessions": len(hub.sessions),
             "tokenRequired": bool(settings.token),
             "web": web_served,
+            "signs": signs_served,
         }
 
     # Transcrição avulsa ------------------------------------------------------
@@ -263,6 +267,9 @@ def create_app(
             receiver.cancel()
             hub.unsubscribe(session, queue)
 
+    if signs_served:
+        # Pacote de sinais GPL do avatar próprio, gerado à parte (fora deste repositório).
+        app.mount("/signs", StaticFiles(directory=settings.signs_dir), name="signs")
     if web_served:
         # Depois das rotas da API: o resto do caminho é o app (index, estúdio, overlay).
         app.mount("/", StaticFiles(directory=settings.web_dir, html=True), name="web")

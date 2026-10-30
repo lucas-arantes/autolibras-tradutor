@@ -15,8 +15,13 @@ services:
       # Senha para criar sessões e enviar áudio. Vazio: sem senha.
       AUTOLIBRAS_TOKEN: ${AUTOLIBRAS_TOKEN:-}
       AUTOLIBRAS_MAX_SESSIONS: ${AUTOLIBRAS_MAX_SESSIONS:-4}
+      # Pacote de sinais do avatar próprio (GPL-3.0, gerado à parte), servido em /signs/.
+      AUTOLIBRAS_SIGNS_DIR: /signs
     volumes:
       - models:/models
+      # Pasta com o manifest.json do pacote de sinais. Se ela não existir, o Docker
+      # cria uma vazia, e o Estúdio pede o endereço de um pacote publicado.
+      - ${AUTOLIBRAS_SIGNS:-./sinais}:/signs:ro
 
 volumes:
   models:

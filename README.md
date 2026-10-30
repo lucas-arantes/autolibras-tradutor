@@ -32,7 +32,7 @@ docker compose up -d
 
 No Estúdio (http://localhost:8000/studio.html), você escolhe de onde vem o áudio: um dispositivo do computador (microfone, mesa de som, cabo virtual) ou o endereço da transmissão (RTMP, SRT ou HLS), que o servidor lê com o ffmpeg. O Estúdio mostra o endereço do overlay, que entra no OBS como fonte de navegador. O endereço não muda de uma live para outra. O passo a passo está em [Libras na sua live com o OBS](docs/transmissoes-obs.md).
 
-Por enquanto o overlay usa o avatar do VLibras, cujos termos de uso não autorizam tradução automática em produções audiovisuais, e o player dele tem fundo opaco. O overlay serve para testes e demonstrações até o avatar próprio ficar pronto.
+O overlay usa o avatar próprio, com fundo transparente e o tradutor de regras local, sem depender dos serviços do VLibras. Ele precisa de um pacote de sinais, que o servidor serve a partir da pasta `sinais`. O avatar do VLibras também pode ser escolhido, mas os termos de uso do VLibras não autorizam tradução automática em produções audiovisuais, então ele fica para testes.
 
 ## Como rodar
 

@@ -36,6 +36,7 @@ def test_health(client: TestClient) -> None:
         "sessions": 0,
         "tokenRequired": False,
         "web": False,
+        "signs": False,
     }
 
 

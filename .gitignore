@@ -13,3 +13,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.egg-info/
+
+# Pacote de sinais local do avatar próprio (GPL-3.0, montado no Docker)
+/sinais/

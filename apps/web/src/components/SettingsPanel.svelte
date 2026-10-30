@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { VLibrasAvatar } from "@autolibras/vlibras";
+import { type AvatarKind, SIGN_PACK_URL } from "../lib/avatar";
 import type { RecognizerMode, Settings, TranslatorMode } from "../lib/settings";
 
 let { settings, onChange }: { settings: Settings; onChange: (changes: Partial<Settings>) => void } =
@@ -21,6 +22,19 @@ const recognizers: Array<{ value: RecognizerMode; label: string; hint: string }>
 const translators: Array<{ value: TranslatorMode; label: string; hint: string }> = [
   { value: "vlibras", label: "VLibras", hint: "Melhor qualidade; usa regras locais se falhar." },
   { value: "regras", label: "Regras locais", hint: "Funciona sem enviar texto a servidores." },
+];
+
+const avatarKinds: Array<{ value: AvatarKind; label: string; hint: string }> = [
+  {
+    value: "vlibras",
+    label: "VLibras",
+    hint: "Player do governo. Os termos dele não permitem uso em vídeos e transmissões.",
+  },
+  {
+    value: "propio",
+    label: "Avatar próprio",
+    hint: "Avatar aberto do AutoLibras, desenhado aqui mesmo. Precisa do pacote de sinais.",
+  },
 ];
 
 const avatars: Array<{ value: VLibrasAvatar; label: string }> = [
@@ -86,17 +100,55 @@ const avatars: Array<{ value: VLibrasAvatar; label: string }> = [
     {/each}
   </fieldset>
 
-  <label class="field">
-    <span>Avatar</span>
-    <select
-      value={settings.avatar}
-      onchange={(event) => onChange({ avatar: event.currentTarget.value as VLibrasAvatar })}
-    >
-      {#each avatars as avatar (avatar.value)}
-        <option value={avatar.value}>{avatar.label}</option>
-      {/each}
-    </select>
-  </label>
+  <fieldset>
+    <legend>Avatar</legend>
+    {#each avatarKinds as option (option.value)}
+      <label class="choice">
+        <input
+          type="radio"
+          name="avatarKind"
+          value={option.value}
+          checked={settings.avatarKind === option.value}
+          onchange={() => onChange({ avatarKind: option.value })}
+        />
+        <span>
+          <strong>{option.label}</strong>
+          <small>{option.hint}</small>
+        </span>
+      </label>
+    {/each}
+    {#if settings.avatarKind === "vlibras"}
+      <label class="field url">
+        <span>Personagem</span>
+        <select
+          value={settings.avatar}
+          onchange={(event) => onChange({ avatar: event.currentTarget.value as VLibrasAvatar })}
+        >
+          {#each avatars as avatar (avatar.value)}
+            <option value={avatar.value}>{avatar.label}</option>
+          {/each}
+        </select>
+      </label>
+    {:else}
+      <label class="field url">
+        <span>Pacote de sinais (URL)</span>
+        <input
+          type="url"
+          value={settings.signsUrl}
+          placeholder={SIGN_PACK_URL || "https://…/BR/"}
+          spellcheck="false"
+          onchange={(event) => onChange({ signsUrl: event.currentTarget.value.trim() })}
+        />
+        <small>
+          {#if SIGN_PACK_URL}
+            Vazio usa o pacote padrão deste site.
+          {:else}
+            Pasta com o <code>manifest.json</code> do pacote. Sem ela, o app continua com o VLibras.
+          {/if}
+        </small>
+      </label>
+    {/if}
+  </fieldset>
 
   <label class="field">
     <span>Velocidade base: {settings.baseSpeed.toFixed(2)}×</span>

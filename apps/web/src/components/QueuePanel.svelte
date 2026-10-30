@@ -1,4 +1,6 @@
 <script lang="ts">
+import type { Attachment } from "svelte/attachments";
+import type { AvatarKind } from "../lib/avatar";
 import type { AvatarStatus } from "../lib/controller.svelte";
 
 let {
@@ -8,6 +10,8 @@ let {
   pending,
   dropped,
   avatarStatus,
+  avatarKind,
+  avatarCanvas,
   onClear,
   onRetry,
 }: {
@@ -17,9 +21,20 @@ let {
   pending: number;
   dropped: number;
   avatarStatus: AvatarStatus;
+  avatarKind: AvatarKind;
+  /** Canvas do avatar próprio (o VLibras desenha numa janela própria). */
+  avatarCanvas: HTMLCanvasElement | null;
   onClear: () => void;
   onRetry: () => void;
 } = $props();
+
+/** Põe o canvas do avatar na página (ele é criado pelo controlador, não pelo Svelte). */
+function mountCanvas(canvas: HTMLCanvasElement): Attachment<HTMLElement> {
+  return (host) => {
+    host.append(canvas);
+    return () => canvas.remove();
+  };
+}
 
 const fill = $derived(Math.min(100, (lagSeconds / maxLagSeconds) * 100));
 const level = $derived(fill > 75 ? "high" : fill > 40 ? "medium" : "low");
@@ -33,14 +48,22 @@ const level = $derived(fill > 75 ? "high" : fill > 40 ? "medium" : "low");
     {/if}
   </div>
 
+  {#if avatarCanvas}
+    <div class="stage" {@attach mountCanvas(avatarCanvas)}></div>
+  {/if}
+
   {#if avatarStatus === "carregando"}
-    <p class="muted">Carregando o avatar do VLibras… (pode levar alguns segundos)</p>
+    <p class="muted">
+      {avatarKind === "propio"
+        ? "Carregando o avatar e o pacote de sinais…"
+        : "Carregando o avatar do VLibras… (pode levar alguns segundos)"}
+    </p>
   {:else if avatarStatus === "erro"}
     <p class="muted">
       Não foi possível carregar o avatar.
       <button type="button" class="link" onclick={onRetry}>Tentar de novo</button>
     </p>
-  {:else}
+  {:else if avatarKind === "vlibras"}
     <p class="muted">O avatar aparece na janela do VLibras, no canto da tela.</p>
   {/if}
 
@@ -76,6 +99,18 @@ const level = $derived(fill > 75 ? "high" : fill > 40 ? "medium" : "low");
 </section>
 
 <style>
+  .stage {
+    margin-bottom: 0.75rem;
+  }
+
+  .stage :global(canvas) {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+
   .muted {
     margin: 0 0 0.75rem;
     color: var(--text-muted);

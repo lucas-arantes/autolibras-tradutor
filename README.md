@@ -14,7 +14,7 @@ A fala pode ser transcrita de dois jeitos. O padrão é a Web Speech API do nave
 
 Cada frase transcrita vai para o tradutor de glosa do VLibras. Se ele falhar ou levar mais de 4 segundos, o app usa um tradutor de regras próprio, que roda no navegador. Também dá para usar só as regras, sem enviar o texto a nenhum servidor. As regras baixam uma vez a lista de sinais do VLibras e a guardam no navegador; com ela, reconhecem verbos e expressões que não estão na lista do próprio pacote. Sem a lista, continuam funcionando.
 
-O avatar é o Widget oficial do VLibras, carregado dos servidores do governo quando a página abre. O app manda a glosa direto para o player do Widget.
+O avatar padrão é o Widget oficial do VLibras, carregado dos servidores do governo quando a página abre. O app manda a glosa direto para o player do Widget. Nas configurações dá para trocar pelo [avatar próprio](packages/avatar-three/README.md), um modelo VRM aberto desenhado na própria página, quando houver um pacote de sinais configurado.
 
 A fala costuma ser mais rápida que a sinalização, então as frases passam por uma fila. Quando o atraso cresce, o avatar acelera. Se o atraso passa do limite configurado, as frases pendentes mais antigas são descartadas, mas o texto delas continua na legenda e no histórico. A fila mede quanto tempo cada sinal leva de fato e ajusta as estimativas com isso.
 
@@ -53,7 +53,7 @@ packages/
   gloss-rules/   Tradutor PT→glosa por regras (verbos, plurais, números, expressões), com ou sem o dicionário de sinais
   stt-web/       Reconhecimento de fala: Web Speech API e cliente do servidor Whisper
   vlibras/       Adaptadores do VLibras: API de tradução, avatar do Widget, proteção contra captura de cliques
-  avatar-three/  Avatar próprio em VRM (three.js), em desenvolvimento e ainda fora do app
+  avatar-three/  Avatar próprio em VRM (three.js), que o app pode usar no lugar do VLibras
 apps/
   web/           PWA em Svelte 5 + Vite (inclui player.html, o avatar sozinho usado pela extensão)
   extension/     Extensão do Chrome (Manifest V3) que traduz o áudio de uma aba
@@ -61,7 +61,7 @@ services/
   stt-server/    Servidor de transcrição em Python (Whisper, VAD, WebSocket)
 ```
 
-Cada etapa implementa uma interface definida em `@autolibras/core`. Por isso dá para trocar o reconhecedor de fala, o tradutor ou o avatar sem mexer nas outras etapas. O [avatar próprio](packages/avatar-three/README.md) usa essa mesma interface e vai substituir o do VLibras quando estiver pronto.
+Cada etapa implementa uma interface definida em `@autolibras/core`. Por isso dá para trocar o reconhecedor de fala, o tradutor ou o avatar sem mexer nas outras etapas. O [avatar próprio](packages/avatar-three/README.md) usa essa mesma interface e já pode ser escolhido no app. Ele vai substituir o do VLibras depois de avaliado por pessoas surdas.
 
 ## Limitações conhecidas
 

@@ -112,6 +112,8 @@ function onSubmit(event: SubmitEvent) {
       pending={app.pending}
       dropped={app.dropped}
       avatarStatus={app.avatarStatus}
+      avatarKind={app.avatarKind}
+      avatarCanvas={app.avatarCanvas}
       onClear={() => app.clearQueue()}
       onRetry={() => app.loadAvatar()}
     />

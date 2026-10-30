@@ -89,7 +89,7 @@ O avatar precisa de WebGL, e a janela do Widget fica fixa no canto direito da te
 
 ## Contribuindo
 
-Veja [CONTRIBUTING.md](CONTRIBUTING.md). Avaliações de pessoas surdas e intérpretes sobre a qualidade da sinalização ajudam muito.
+Veja [CONTRIBUTING.md](CONTRIBUTING.md). Avaliações de pessoas surdas e intérpretes sobre a qualidade da sinalização ajudam muito. O [teste de compreensão](docs/avaliacao/protocolo.md) tem o protocolo, o termo de consentimento e uma página (`avaliacao.html`) que mostra as frases e exporta as respostas em CSV.
 
 ## Aviso
 

@@ -103,7 +103,7 @@ export async function createAvatar(
 }
 
 /** Esconde ou mostra a janela flutuante do Widget do VLibras (elemento `[vw]`). */
-function setVLibrasWidgetHidden(hidden: boolean): void {
+export function setVLibrasWidgetHidden(hidden: boolean): void {
   if (typeof document === "undefined") return;
   for (const el of document.querySelectorAll<HTMLElement>("[vw]")) {
     el.style.display = hidden ? "none" : "";

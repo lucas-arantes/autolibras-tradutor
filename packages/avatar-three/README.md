@@ -86,7 +86,7 @@ Para gerar um pacote, você precisa do Blender 4.5 ou mais recente e do Python 3
 python3 packages/avatar-three/tools/clips/build_pack.py --out packages/avatar-three/demo/public/signs OI BOM_DIA EU VOCÊ NOME CASA OBRIGADO GOSTAR NÃO QUAL TUDO_BEM ÁGUA A B C D E F G H I J K L M N O P Q R S T U V W X Y Z Ç
 ```
 
-`--all` converte o dicionário inteiro (~23 mil sinais). Os `.blend` baixados (~60 GB) ficam em `~/.cache/autolibras/vlibras-sources`, e o script retoma de onde parou. Ele baixa e converte lote a lote. Um sinal que falha, seja no download ou no Blender, vai para `failures.json` sem parar os outros e é tentado de novo na próxima execução. `--ref` fixa o commit do dicionário, que fica registrado no `manifest.json` (`sourceCommit`). Alguns arquivos do repositório de origem têm o nome em NFD (o acento separado da letra), e o download tenta as duas formas.
+`--all` converte o dicionário inteiro (~23 mil sinais). Os `.blend` baixados (~40 GB) ficam em `~/.cache/autolibras/vlibras-sources`, e o script retoma de onde parou. Ele baixa e converte lote a lote. Um sinal que falha, seja no download ou no Blender, vai para `failures.json` sem parar os outros e é tentado de novo na próxima execução. `--ref` fixa o commit do dicionário, que fica registrado no `manifest.json` (`sourceCommit`). Alguns arquivos do repositório de origem têm o nome em NFD (o acento separado da letra), e o download tenta as duas formas.
 
 A conversão (`tools/clips/vlibras_to_vrm.py`) roda no Blender headless:
 

@@ -30,4 +30,4 @@ O servidor em `services/stt-server` instala estas dependências pelo pip. O mode
 
 ## Dependências de desenvolvimento e build
 
-Todas são instaladas pelo npm e têm licenças permissivas: Svelte (MIT), Vite (MIT), Vitest (MIT), TypeScript (Apache-2.0), Biome (MIT/Apache-2.0) e jsdom (MIT).
+Todas são instaladas pelo npm e têm licenças permissivas: Svelte (MIT), Vite (MIT), Vitest (MIT), TypeScript (Apache-2.0), Biome (MIT/Apache-2.0), jsdom (MIT) e @types/chrome (MIT).

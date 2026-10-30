@@ -6,7 +6,10 @@ import os
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 
-DEFAULT_ORIGINS = "http://localhost:*,http://127.0.0.1:*,https://lucas-arantes.github.io"
+# O app local, o site publicado e a extensão do navegador (origem chrome-extension://<id>).
+DEFAULT_ORIGINS = (
+    "http://localhost:*,http://127.0.0.1:*,https://lucas-arantes.github.io,chrome-extension://*"
+)
 
 
 def _env(name: str, default: str) -> str:

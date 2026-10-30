@@ -2,7 +2,7 @@
 
 O AutoLibras Tradutor ouve português falado e mostra a tradução em Libras (Língua Brasileira de Sinais) com um avatar 3D, enquanto a pessoa fala. A fala vira texto, o texto vira glosa de Libras e o avatar sinaliza a glosa.
 
-O projeto está no começo. Por enquanto existe a versão web, publicada em https://lucas-arantes.github.io/autolibras-tradutor/, e um servidor de transcrição opcional. Para falar em vez de digitar, use Chrome, Edge ou Safari, ou rode o servidor.
+O projeto está no começo. Por enquanto existem a versão web, publicada em https://lucas-arantes.github.io/autolibras-tradutor/, uma extensão do Chrome que traduz o áudio de outras abas (YouTube, Meet) e um servidor de transcrição opcional. Para falar em vez de digitar, use Chrome, Edge ou Safari, ou rode o servidor.
 
 ## Como funciona
 
@@ -19,6 +19,8 @@ O avatar é o Widget oficial do VLibras, carregado dos servidores do governo qua
 A fala costuma ser mais rápida que a sinalização, então as frases passam por uma fila. Quando o atraso cresce, o avatar acelera. Se o atraso passa do limite configurado, as frases pendentes mais antigas são descartadas, mas o texto delas continua na legenda e no histórico. A fila mede quanto tempo cada sinal leva de fato e ajusta as estimativas com isso.
 
 Também é possível digitar o texto. Isso funciona em qualquer navegador, mesmo sem microfone.
+
+A [extensão do Chrome](apps/extension/README.md) faz o mesmo com o áudio de uma aba, como um vídeo ou uma reunião, e mostra a legenda e o avatar sobre a página.
 
 ## Como rodar
 
@@ -51,7 +53,8 @@ packages/
   stt-web/       Reconhecimento de fala: Web Speech API e cliente do servidor Whisper
   vlibras/       Adaptadores do VLibras: API de tradução, avatar do Widget, proteção contra captura de cliques
 apps/
-  web/           PWA em Svelte 5 + Vite
+  web/           PWA em Svelte 5 + Vite (inclui player.html, o avatar sozinho usado pela extensão)
+  extension/     Extensão do Chrome (Manifest V3) que traduz o áudio de uma aba
 services/
   stt-server/    Servidor de transcrição em Python (Whisper, VAD, WebSocket)
 ```

@@ -1,4 +1,5 @@
 import { Emitter, type SpeechRecognizer, type SpeechRecognizerEvents } from "@autolibras/core";
+import workletUrl from "./capture-worklet.js?url";
 import { Pcm16Encoder } from "./pcm";
 
 /** Parte do WebSocket usada aqui (permite testar sem rede). */
@@ -39,41 +40,42 @@ type ServerMessage =
 
 const OPEN = 1;
 
-// Copia cada bloco de 128 amostras do microfone para a thread principal.
-const WORKLET_SOURCE = `
-registerProcessor("autolibras-capture", class extends AudioWorkletProcessor {
-  process(inputs) {
-    const channel = inputs[0] && inputs[0][0];
-    if (channel) this.port.postMessage(channel.slice(0));
-    return true;
-  }
-});`;
+export interface StreamCaptureOptions {
+  /** Toca o áudio capturado. Necessário na captura de aba, que silencia a aba original. */
+  playback?: boolean;
+}
 
-/** Captura padrão do navegador: getUserMedia + AudioWorklet. */
+/** Captura de um `MediaStream` qualquer (microfone, aba) com AudioWorklet. */
+export function captureStream(
+  stream: MediaStream,
+  options: StreamCaptureOptions = {},
+): CaptureAudio {
+  return async (onSamples) => {
+    const context = new AudioContext();
+    await context.audioWorklet.addModule(workletUrl);
+    const source = context.createMediaStreamSource(stream);
+    const node = new AudioWorkletNode(context, "autolibras-capture");
+    node.port.onmessage = (event: MessageEvent<Float32Array>) => onSamples(event.data);
+    source.connect(node);
+    if (options.playback) source.connect(context.destination);
+    return {
+      sampleRate: context.sampleRate,
+      stop() {
+        node.port.onmessage = null;
+        source.disconnect();
+        for (const track of stream.getTracks()) track.stop();
+        void context.close();
+      },
+    };
+  };
+}
+
+/** Captura padrão do navegador: o microfone. */
 export const captureMicrophone: CaptureAudio = async (onSamples) => {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
   });
-  const context = new AudioContext();
-  const moduleUrl = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: "text/javascript" }));
-  try {
-    await context.audioWorklet.addModule(moduleUrl);
-  } finally {
-    URL.revokeObjectURL(moduleUrl);
-  }
-  const source = context.createMediaStreamSource(stream);
-  const node = new AudioWorkletNode(context, "autolibras-capture");
-  node.port.onmessage = (event: MessageEvent<Float32Array>) => onSamples(event.data);
-  source.connect(node);
-  return {
-    sampleRate: context.sampleRate,
-    stop() {
-      node.port.onmessage = null;
-      source.disconnect();
-      for (const track of stream.getTracks()) track.stop();
-      void context.close();
-    },
-  };
+  return captureStream(stream)(onSamples);
 };
 
 /**

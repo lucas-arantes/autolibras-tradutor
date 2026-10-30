@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AutoLibras · overlay</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;
+        --bar: #0b5cad;
+        --text: #0f1724;
+        --muted: #5b6678;
+        --danger: #c0352b;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #171e29;
+          --bar: #12385f;
+          --text: #f1f5fa;
+          --muted: #93a0b3;
+          --danger: #f06b60;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.4 system-ui, sans-serif;
+      }
+      body {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px 6px 12px;
+        background: var(--bar);
+        color: #fff;
+      }
+      header strong {
+        font-size: 13px;
+      }
+      #status {
+        flex: 1;
+        font-size: 12px;
+        opacity: 0.85;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      header button {
+        border: 0;
+        border-radius: 6px;
+        padding: 4px 8px;
+        background: rgb(255 255 255 / 18%);
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      header button:hover {
+        background: rgb(255 255 255 / 30%);
+      }
+      header button:focus-visible {
+        outline: 2px solid #fff;
+      }
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+      }
+      footer {
+        padding: 8px 12px 10px;
+        min-height: 64px;
+      }
+      #caption {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 500;
+      }
+      #caption.partial {
+        color: var(--muted);
+      }
+      #gloss {
+        margin: 4px 0 0;
+        font: 12px ui-monospace, monospace;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #error {
+        margin: 4px 0 0;
+        color: var(--danger);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>AutoLibras</strong>
+      <span id="status">Conectando…</span>
+      <button id="move" type="button" title="Mudar de canto">Mover</button>
+      <button id="stop" type="button" title="Parar a tradução">Parar</button>
+    </header>
+    <iframe id="player" title="Avatar em Libras" allow="autoplay"></iframe>
+    <footer>
+      <p id="caption" aria-live="polite"></p>
+      <p id="gloss"></p>
+      <p id="error" role="alert" hidden></p>
+    </footer>
+    <script type="module" src="/src/overlay.ts"></script>
+  </body>
+</html>

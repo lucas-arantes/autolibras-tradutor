@@ -19,6 +19,11 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # A extensão pronta para "Carregar sem compactação" no Chrome.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: autolibras-extension
+          path: apps/extension/dist
 
   stt-server:
     runs-on: ubuntu-latest

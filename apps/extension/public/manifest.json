@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "AutoLibras Tradutor",
+  "short_name": "AutoLibras",
+  "version": "0.1.0",
+  "description": "Traduz para Libras o áudio de uma aba (YouTube, Meet e outros sites), com um avatar sobre a página.",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "AutoLibras Tradutor",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["tabCapture", "offscreen", "storage", "scripting", "activeTab"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
+  "web_accessible_resources": [
+    {
+      "resources": ["overlay.html", "assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

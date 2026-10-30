@@ -1,0 +1,21 @@
+{
+  "name": "@autolibras/extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Extensão do Chrome que traduz para Libras o áudio de uma aba",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch --mode development",
+    "check": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@autolibras/core": "*",
+    "@autolibras/stt-web": "*"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.3.5",
+    "vite": "^8.3.5"
+  }
+}

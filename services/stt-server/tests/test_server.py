@@ -69,6 +69,7 @@ def test_audio_invalido_gera_erro_sem_derrubar(client: TestClient) -> None:
         ("http://localhost:5173", True),
         ("http://127.0.0.1:4173", True),
         ("https://lucas-arantes.github.io", True),
+        ("chrome-extension://abcdefghijklmnopabcdefghijklmnop", True),
         ("https://site-qualquer.example", False),
     ],
 )

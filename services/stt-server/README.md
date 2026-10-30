@@ -47,7 +47,7 @@ Tudo é configurado por variáveis de ambiente.
 | `AUTOLIBRAS_BEAM_SIZE` | `1` | Feixe de busca; valores maiores são mais precisos e mais lentos |
 | `AUTOLIBRAS_HOST` | `127.0.0.1` (`0.0.0.0` no Docker) | Endereço em que o servidor escuta |
 | `AUTOLIBRAS_PORT` | `8000` | Porta |
-| `AUTOLIBRAS_ALLOWED_ORIGINS` | localhost, 127.0.0.1 e o site publicado | Páginas que podem usar o servidor, separadas por vírgula. Aceita `*` e porta curinga (`http://localhost:*`) |
+| `AUTOLIBRAS_ALLOWED_ORIGINS` | localhost, 127.0.0.1, o site publicado e extensões do Chrome | Páginas que podem usar o servidor, separadas por vírgula. Aceita `*` e porta curinga (`http://localhost:*`) |
 | `AUTOLIBRAS_MAX_CONCURRENCY` | `1` | Quantas transcrições rodam ao mesmo tempo |
 
 ## Desempenho

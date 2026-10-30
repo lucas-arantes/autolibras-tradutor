@@ -14,11 +14,11 @@
   },
   "scripts": {
     "dev": "npm run dev -w @autolibras/web",
-    "build": "npm run build -w @autolibras/web",
+    "build": "npm run build -w @autolibras/web && npm run build -w @autolibras/extension",
     "preview": "npm run preview -w @autolibras/web",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json && npm run check -w @autolibras/web",
+    "typecheck": "tsc -p tsconfig.json && npm run check -w @autolibras/web && npm run check -w @autolibras/extension",
     "lint": "biome check .",
     "format": "biome check --write ."
   },

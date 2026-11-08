@@ -15,7 +15,7 @@ O site publicado serve a biblioteca num endereço fixo, `closed-signing.js`:
   </video>
 </div>
 <script type="module">
-  import { attachClosedSigning } from "https://lucas-arantes.github.io/autolibras-tradutor/closed-signing.js";
+  import { attachClosedSigning } from "https://autolibras.com.br/closed-signing.js";
 
   const video = document.querySelector("video");
   const libras = attachClosedSigning(video, { signs: "https://…/pacote-de-sinais/" });

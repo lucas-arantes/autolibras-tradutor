@@ -9,7 +9,7 @@
 
 O AutoLibras Tradutor ouve português falado e mostra a tradução em Libras (Língua Brasileira de Sinais) com um avatar 3D, enquanto a pessoa fala. A fala vira texto, o texto vira glosa de Libras e o avatar sinaliza a glosa.
 
-O projeto está no começo. Por enquanto existem a versão web, publicada em https://lucas-arantes.github.io/autolibras-tradutor/, uma extensão do Chrome que traduz o áudio de outras abas (YouTube, Meet), um servidor de transcrição opcional, um overlay para pôr o avatar em transmissões ao vivo pelo OBS e um botão Libras para players de vídeo. Para falar em vez de digitar, use Chrome, Edge ou Safari, ou rode o servidor. A página [Como usar](https://lucas-arantes.github.io/autolibras-tradutor/como-usar.html) do site junta o guia técnico de tudo isso.
+O projeto está no começo. Por enquanto existem a versão web, publicada em https://autolibras.com.br/, uma extensão do Chrome que traduz o áudio de outras abas (YouTube, Meet), um servidor de transcrição opcional, um overlay para pôr o avatar em transmissões ao vivo pelo OBS e um botão Libras para players de vídeo. Para falar em vez de digitar, use Chrome, Edge ou Safari, ou rode o servidor. A página [Como usar](https://autolibras.com.br/como-usar.html) do site junta o guia técnico de tudo isso.
 
 ![O tradutor no navegador: a frase digitada aparece no histórico com a glosa, e o avatar a sinaliza ao lado.](docs/imagens/captura-app.png)
 

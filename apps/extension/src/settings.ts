@@ -14,7 +14,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   serverUrl: "ws://localhost:8000/v1/stream",
   translator: "vlibras",
   avatar: "icaro",
-  playerUrl: "https://lucas-arantes.github.io/autolibras-tradutor/player.html",
+  playerUrl: "https://autolibras.com.br/player.html",
 };
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
